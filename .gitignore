@@ -1,0 +1,7 @@
+.qodo/
+.venv/
+__pycache__/
+*.pyc
+
+Downloads/
+errors.log
