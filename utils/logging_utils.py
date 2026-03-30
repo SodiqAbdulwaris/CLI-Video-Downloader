@@ -1,8 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
-from config.settings import LOG_FILE
+from config.settings import DOWNLOAD_LOG_FILE, ERROR_LOG_FILE
+
+
+def _write_entry(path: Path, entry: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(entry)
 
 
 def log_error(
@@ -29,5 +36,29 @@ def log_error(
         f"Error Message: {error_message}\n"
         "---\n"
     )
-    with LOG_FILE.open("a", encoding="utf-8") as handle:
-        handle.write(entry)
+    _write_entry(ERROR_LOG_FILE, entry)
+
+
+def log_download(
+    *,
+    url: str,
+    media_type: str,
+    resolution: str,
+    format_type: str,
+    codec: str,
+    download_path: str,
+    filename: str,
+) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    entry = (
+        f"[{timestamp}] SUCCESS\n"
+        f"URL: {url}\n"
+        f"Type: {media_type}\n"
+        f"Resolution: {resolution}\n"
+        f"Format: {format_type}\n"
+        f"Codec: {codec}\n"
+        f"Download Path: {download_path}\n"
+        f"Filename: {filename}\n"
+        "---\n"
+    )
+    _write_entry(DOWNLOAD_LOG_FILE, entry)

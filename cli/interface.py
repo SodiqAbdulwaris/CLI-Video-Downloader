@@ -5,7 +5,7 @@ from core.playlist import PlaylistEntry, PlaylistSelectionError, parse_selection
 
 
 def prompt_url() -> str:
-    return input("Enter YouTube Link: ").strip()
+    return input("Enter Video URL: ").strip()
 
 
 def display_video_info(info: dict, formats: list[FormatOption], media_type: str) -> None:

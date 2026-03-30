@@ -11,7 +11,7 @@ from core.ffmpeg import FFmpegError, convert_to_mp3, merge_streams
 from core.formats import FormatOption, FormatSelection, list_resolutions, normalize_formats, select_format
 from core.playlist import PlaylistEntry, get_playlist_entries, is_playlist
 from utils.file_utils import ensure_directory, ensure_unique_path, resolve_output_path, sanitize_name, temporary_prefix
-from utils.logging_utils import log_error
+from utils.logging_utils import log_download, log_error
 
 
 class VideoDownloaderError(RuntimeError):
@@ -238,6 +238,7 @@ class VideoDownloader:
                 )
                 final_path = ensure_unique_path(target_dir / final_name)
                 convert_to_mp3(input_path, final_path)
+                self._log_success(final_path=final_path, selection=selection, context=context)
                 return final_path
 
             final_name = self.generate_filename(
@@ -262,6 +263,7 @@ class VideoDownloader:
                     title=title,
                 )
                 merge_streams(video_path, audio_path, final_path)
+                self._log_success(final_path=final_path, selection=selection, context=context)
                 return final_path
 
             downloaded = self._download_stream(
@@ -271,7 +273,25 @@ class VideoDownloader:
                 title=title,
             )
             downloaded.replace(final_path)
+            self._log_success(final_path=final_path, selection=selection, context=context)
             return final_path
+
+    def _log_success(
+        self,
+        *,
+        final_path: Path,
+        selection: FormatSelection,
+        context: DownloadContext,
+    ) -> None:
+        log_download(
+            url=context.url,
+            media_type=context.media_type.title(),
+            resolution=selection.resolution,
+            format_type="audio-only" if selection.format_type == "audio" else "video+audio",
+            codec=selection.codec_label,
+            download_path=str(final_path.parent),
+            filename=final_path.name,
+        )
 
     def _download_stream(
         self,

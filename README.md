@@ -71,5 +71,6 @@ Downloads/
 - `FFmpeg is not installed`: install FFmpeg and ensure it is available on `PATH`
 - `Invalid URL`: provide a full link
     - Get link by right clicking the video and clicking **Copy Video URL**
+- Successful downloads are recorded in `C:\Users\HP\Videos\CLI-Video-Downloads\download_history.log`
 - Playlist item failures: check `errors.log`; the downloader continues with remaining videos
 - Missing output file after download: retry the download and verify the source URL is still available

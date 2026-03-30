@@ -254,10 +254,18 @@ def _resolution_candidates(
     for default_resolution in DEFAULT_RESOLUTION_PRIORITY:
         if default_resolution not in priorities:
             priorities.append(default_resolution)
-    for resolution in available:
+    for resolution in _fallback_resolution_order(available):
         if resolution not in priorities:
             priorities.append(resolution)
     return priorities
+
+
+def _fallback_resolution_order(available: list[str]) -> list[str]:
+    if len(available) <= 1:
+        return available
+    if len(available) == 2:
+        return [available[1], available[0]]
+    return [available[1], available[0], *available[2:]]
 
 
 def _resolution_label(raw: dict[str, Any], height: int) -> str:
