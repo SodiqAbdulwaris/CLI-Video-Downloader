@@ -56,6 +56,10 @@ python main.py
 ```
 
 
+## YouTube Cookie Authentication
+
+To reduce YouTube bot-detection errors, export a Netscape-format `cookies.txt` directly from a browser session logged into YouTube, for example with the "Get cookies.txt LOCALLY" extension, and place it at `config/cookies.txt`. Re-export it periodically because YouTube session cookies expire. Never share this file or commit it to git.
+
 ## Download Layout
 
 ```text

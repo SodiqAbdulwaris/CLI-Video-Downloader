@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yt_dlp
-from config.settings import DEFAULT_RETRY_ATTEMPTS, DEFAULT_TIMEOUT_SECONDS
+from config.settings import COOKIES_FILE_PATH, DEFAULT_RETRY_ATTEMPTS, DEFAULT_TIMEOUT_SECONDS
 from core.ffmpeg import FFmpegError, convert_to_mp3, merge_streams
 from core.formats import FormatOption, FormatSelection, list_resolutions, normalize_formats, select_format
 from core.playlist import PlaylistEntry, get_playlist_entries, is_playlist
@@ -42,6 +42,13 @@ class VideoDownloader:
             "socket_timeout": DEFAULT_TIMEOUT_SECONDS,
             "http_headers": {},
         }
+        if COOKIES_FILE_PATH.exists():
+            self._base_options["cookiefile"] = str(COOKIES_FILE_PATH)
+        else:
+            print(
+                "Warning: cookie auth is not active because "
+                f"{COOKIES_FILE_PATH} does not exist. YouTube bot-detection errors are more likely."
+            )
 
     def fetch_info(self, url: str) -> dict[str, Any]:
         options = dict(self._base_options)

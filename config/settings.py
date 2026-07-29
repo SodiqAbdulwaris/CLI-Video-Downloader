@@ -4,6 +4,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DOWNLOADS_ROOT = PROJECT_ROOT / "Downloads"
+COOKIES_FILE_PATH = PROJECT_ROOT / "config" / "cookies.txt"
 SINGLE_VIDEOS_DIR = DOWNLOADS_ROOT / "Single Videos"
 SHORTS_DIR = DOWNLOADS_ROOT / "Shorts"
 PLAYLISTS_DIR = DOWNLOADS_ROOT / "Playlists"
