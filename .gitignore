@@ -1,6 +1,17 @@
+# ── Docker / deployment ───────────────────────────────────────────────────────
+# Root .env (Compose variables — contains host paths, never commit)
+/.env
+
+
+# mkcert-generated TLS certificates — generate locally with mkcert, never commit
+nginx/certs/*.pem
+nginx/certs/*-key.pem
+
+# ── Project ────────────────────────────────────────────────────────────────────
 .qodo/
 .venv/
 docs/
+downloader inspo 1.webp
 
 __pycache__/
 *.pyc

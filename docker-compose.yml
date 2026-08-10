@@ -1,0 +1,114 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml — YT Downloader production stack (local Docker Desktop)
+#
+# Services
+#   backend        FastAPI app (internal only, no host port)
+#   bgutil-provider  PO Token provider (internal only, no host port)
+#   nginx          Reverse proxy + TLS termination (publishes 80 + 443)
+#
+# Internal network: ytdl-net
+#   All services join this network. Only nginx publishes ports to the host.
+#   Backend and bgutil-provider are reachable by service name inside the network
+#   but are never directly addressable from the host.
+#
+# Prerequisites — run ONCE before `docker compose up`:
+#   1. Install mkcert (see README § mkcert Setup)
+#   2. mkcert -install                          (installs local CA)
+#   3. cd nginx/certs && mkcert ytdownloader.local
+#   4. Add 127.0.0.1 ytdownloader.local to your hosts file
+#   5. Copy .env.example → .env and fill in DOWNLOADS_ROOT
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── bgutil PO Token provider ────────────────────────────────────────────────
+  bgutil-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    container_name: ytdl-bgutil
+    restart: unless-stopped
+    networks:
+      - ytdl-net
+    # No host ports published — backend reaches this by service name:
+    #   http://bgutil-provider:4416
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4416/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── FastAPI backend ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ytdl-backend
+    restart: unless-stopped
+    networks:
+      - ytdl-net
+    # No host ports — only nginx can reach this service
+    environment:
+      # Override the downloads root so files land in the host bind-mount below.
+      # The container's Path.home() is /root or /home/appuser, not the host path.
+      DOWNLOADS_ROOT: /downloads
+
+      # Point yt-dlp PO Token plugin at bgutil-provider by Docker service name.
+      # Replace 127.0.0.1 (which only works on the host loopback) with the
+      # Docker-internal service hostname so the two containers can talk.
+      POT_PROVIDER_BASE_URL: http://bgutil-provider:4416
+
+    volumes:
+      # cookies.txt — bind-mounted read-only; NEVER copied into the image.
+      # Refresh this file periodically as YouTube session cookies expire.
+      - ./backend/config/cookies.txt:/app/config/cookies.txt:ro
+
+      # Host Downloads folder → /downloads inside the container.
+      # Linux/macOS: set DOWNLOADS_ROOT_HOST=$HOME/Downloads in .env
+      # Windows CMD:  set DOWNLOADS_ROOT_HOST=%USERPROFILE%\Downloads
+      # Windows PS:   $env:DOWNLOADS_ROOT_HOST="$env:USERPROFILE\Downloads"
+      # Or just hard-code the path in .env (see .env.example).
+      - "${DOWNLOADS_ROOT_HOST}/YT-Video Downloader:/downloads"
+
+    depends_on:
+      bgutil-provider:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── nginx reverse proxy (public entry point) ─────────────────────────────────
+  nginx:
+    # Re-use the frontend Dockerfile's final nginx stage which already contains
+    # the built static files. This is cleaner than a separate nginx image +
+    # shared volume because no runtime coordination is needed — the built assets
+    # are baked into the image at build time.
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: final
+    container_name: ytdl-nginx
+    restart: unless-stopped
+    networks:
+      - ytdl-net
+    ports:
+      # Only nginx publishes to the host. All other services are internal.
+      - "80:80"
+      - "443:443"
+    volumes:
+      # nginx configuration
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/ytdownloader.conf:ro
+      # mkcert-generated TLS certificates (generated once, see README)
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+
+# ── Internal network ────────────────────────────────────────────────────────
+networks:
+  ytdl-net:
+    driver: bridge
+    name: ytdl-net

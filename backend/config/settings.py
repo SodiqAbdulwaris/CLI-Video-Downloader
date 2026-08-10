@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-# Assumes the OS Downloads folder has not been relocated from its default location.
-DOWNLOADS_ROOT = Path.home() / "Downloads" / "YT-Video Downloader"
+# Allows overriding the downloads root via environment variable so Docker
+# containers can bind-mount the host Downloads folder without touching code.
+# Falls back to the OS default location when the variable is not set.
+_DOWNLOADS_ROOT_ENV = os.environ.get("DOWNLOADS_ROOT")
+DOWNLOADS_ROOT = Path(_DOWNLOADS_ROOT_ENV) if _DOWNLOADS_ROOT_ENV else Path.home() / "Downloads" / "YT-Video Downloader"
 COOKIES_FILE_PATH = PROJECT_ROOT / "config" / "cookies.txt"
 SINGLE_VIDEOS_DIR = DOWNLOADS_ROOT / "Single Videos"
 SHORTS_DIR = DOWNLOADS_ROOT / "Shorts"

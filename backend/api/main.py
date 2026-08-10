@@ -23,6 +23,12 @@ app.add_middleware(
 jobs = JobManager()
 
 
+@app.get("/health")
+async def health_check() -> dict:
+    """Lightweight liveness probe used by Docker Compose healthcheck."""
+    return {"status": "ok"}
+
+
 class ResolveRequest(BaseModel):
     url: str
 

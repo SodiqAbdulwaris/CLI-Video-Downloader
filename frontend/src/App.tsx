@@ -64,9 +64,17 @@ interface JobItem {
   error: string | null;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// In production (Docker + nginx), VITE_API_BASE_URL is intentionally left empty so
+// HTTP requests use relative paths (/api/...) — nginx same-origin proxies them.
+// In development, set VITE_API_BASE_URL=http://localhost:8000 in frontend/.env.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const getWsUrl = (baseUrl: string, jobId: string) => {
+  if (!baseUrl) {
+    // Production: derive WebSocket URL from the current page origin
+    const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${wsProto}://${window.location.host}/api/ws/${jobId}`;
+  }
   const wsProto = baseUrl.startsWith('https') ? 'wss' : 'ws';
   const cleanUrl = baseUrl.replace(/^https?:\/\//, '');
   return `${wsProto}://${cleanUrl}/api/ws/${jobId}`;
