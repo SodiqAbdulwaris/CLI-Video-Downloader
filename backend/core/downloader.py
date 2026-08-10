@@ -3,7 +3,7 @@ from __future__ import annotations
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 import yt_dlp
 from config.settings import COOKIES_FILE_PATH, DEFAULT_RETRY_ATTEMPTS, DEFAULT_TIMEOUT_SECONDS
@@ -34,6 +34,10 @@ class PlaylistResult:
     failures: list[str]
 
 
+ProgressHook = Callable[[dict[str, Any]], None]
+PlaylistItemStatusCallback = Callable[[PlaylistEntry, Literal["downloading", "done", "failed"], str | None], None]
+
+
 class VideoDownloader:
     def __init__(self) -> None:
         self._base_options = {
@@ -42,6 +46,7 @@ class VideoDownloader:
             "socket_timeout": DEFAULT_TIMEOUT_SECONDS,
             "http_headers": {},
         }
+        print(f"Cookies file: {COOKIES_FILE_PATH.resolve()}")
         if COOKIES_FILE_PATH.exists():
             self._base_options["cookiefile"] = str(COOKIES_FILE_PATH)
         else:
@@ -58,6 +63,16 @@ class VideoDownloader:
                 return ydl.extract_info(url, download=False)
         except yt_dlp.utils.DownloadError as exc:
             raise VideoDownloaderError(f"Could not fetch media information: {exc}") from exc
+
+    def fetch_playlist_listing(self, url: str) -> dict[str, Any]:
+        """Return playlist metadata and flat entry references without resolving every video."""
+        options = dict(self._base_options)
+        options.update({"extract_flat": "in_playlist", "skip_download": True, "noplaylist": False})
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                return ydl.extract_info(url, download=False)
+        except yt_dlp.utils.DownloadError as exc:
+            raise VideoDownloaderError(f"Could not fetch playlist information: {exc}") from exc
 
     def detect_type(self, info: dict[str, Any]) -> Literal["single", "playlist", "short"]:
         if is_playlist(info):
@@ -127,6 +142,7 @@ class VideoDownloader:
         format_type: str = "video",
         playlist_index: int | None = None,
         playlist_title: str | None = None,
+        progress_hook: ProgressHook | None = None,
     ) -> Path:
         info = self.fetch_info(url)
         formats = self.get_formats(info)
@@ -148,7 +164,13 @@ class VideoDownloader:
 
         for attempt in range(1, DEFAULT_RETRY_ATTEMPTS + 1):
             try:
-                return self._download_once(info=info, selection=selected, target_dir=target_dir, context=context)
+                return self._download_once(
+                    info=info,
+                    selection=selected,
+                    target_dir=target_dir,
+                    context=context,
+                    progress_hook=progress_hook,
+                )
             except (yt_dlp.utils.DownloadError, OSError, FFmpegError, VideoDownloaderError) as exc:
                 if attempt == DEFAULT_RETRY_ATTEMPTS:
                     filename = self.generate_filename(
@@ -177,8 +199,10 @@ class VideoDownloader:
         resolution: str | None,
         format_type: str,
         playlist_info: dict[str, Any] | None = None,
+        progress_hook_factory: Callable[[PlaylistEntry], ProgressHook | None] | None = None,
+        item_status_callback: PlaylistItemStatusCallback | None = None,
     ) -> PlaylistResult:
-        info = playlist_info or self.fetch_info(url)
+        info = playlist_info or self.fetch_playlist_listing(url)
         entries = get_playlist_entries(info)
         playlist_title = str(info.get("title") or "Playlist")
         failures: list[str] = []
@@ -188,6 +212,8 @@ class VideoDownloader:
             entry = entries[index]
             print(f"Downloading video {offset} of {len(indices)}: {entry.title}")
             try:
+                if item_status_callback:
+                    item_status_callback(entry, "downloading", None)
                 entry_info = self.fetch_info(entry.url)
                 selected = self.select_best_format(
                     formats=self.get_formats(entry_info),
@@ -203,10 +229,15 @@ class VideoDownloader:
                     format_type=format_type,
                     playlist_index=entry.index,
                     playlist_title=playlist_title,
+                    progress_hook=progress_hook_factory(entry) if progress_hook_factory else None,
                 )
                 completed += 1
+                if item_status_callback:
+                    item_status_callback(entry, "done", None)
             except Exception as exc:
                 failures.append(f"{entry.index}. {entry.title}: {exc}")
+                if item_status_callback:
+                    item_status_callback(entry, "failed", str(exc))
                 log_error(
                     url=entry.url,
                     media_type="Playlist",
@@ -226,6 +257,7 @@ class VideoDownloader:
         selection: FormatSelection,
         target_dir: Path,
         context: DownloadContext,
+        progress_hook: ProgressHook | None = None,
     ) -> Path:
         title = str(info.get("title") or "video")
         with tempfile.TemporaryDirectory(prefix="yt_downloader_") as temp_dir_str:
@@ -236,6 +268,7 @@ class VideoDownloader:
                     format_selector=selection.audio_format_id or selection.video_format_id,
                     output_prefix=temporary_prefix(temp_dir, "audio_source"),
                     title=title,
+                    progress_hook=progress_hook,
                 )
                 final_name = self.generate_filename(
                     title=title,
@@ -262,12 +295,14 @@ class VideoDownloader:
                     format_selector=selection.video_format_id,
                     output_prefix=temporary_prefix(temp_dir, "video_stream"),
                     title=title,
+                    progress_hook=progress_hook,
                 )
                 audio_path = self._download_stream(
                     url=context.url,
                     format_selector=selection.audio_format_id,
                     output_prefix=temporary_prefix(temp_dir, "audio_stream"),
                     title=title,
+                    progress_hook=progress_hook,
                 )
                 merge_streams(video_path, audio_path, final_path)
                 self._log_success(final_path=final_path, selection=selection, context=context)
@@ -278,6 +313,7 @@ class VideoDownloader:
                 format_selector=selection.video_format_id,
                 output_prefix=temporary_prefix(temp_dir, "muxed_stream"),
                 title=title,
+                progress_hook=progress_hook,
             )
             downloaded.replace(final_path)
             self._log_success(final_path=final_path, selection=selection, context=context)
@@ -306,6 +342,7 @@ class VideoDownloader:
         format_selector: str | None,
         output_prefix: Path,
         title: str,
+        progress_hook: ProgressHook | None = None,
     ) -> Path:
         if not format_selector:
             raise VideoDownloaderError("A required media stream could not be identified.")
@@ -321,6 +358,8 @@ class VideoDownloader:
                 "noplaylist": True,
             }
         )
+        if progress_hook:
+            options["progress_hooks"] = [progress_hook]
         with yt_dlp.YoutubeDL(options) as ydl:
             ydl.download([url])
 

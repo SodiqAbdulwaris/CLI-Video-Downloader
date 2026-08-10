@@ -37,8 +37,9 @@ def main() -> int:
     try:
         check_dependencies()
         downloader = VideoDownloader()
-        info = downloader.fetch_info(url)
-        media_type = downloader.detect_type(info)
+        listing_info = downloader.fetch_playlist_listing(url)
+        media_type = downloader.detect_type(listing_info)
+        info = listing_info if media_type == "playlist" else downloader.fetch_info(url)
 
         if media_type == "playlist":
             entries = get_playlist_entries(info)

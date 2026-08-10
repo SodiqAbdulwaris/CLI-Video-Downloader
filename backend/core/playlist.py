@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlencode, urlparse
 
 
 class PlaylistSelectionError(ValueError):
@@ -25,18 +26,33 @@ def get_playlist_entries(info: dict[str, Any]) -> list[PlaylistEntry]:
     for position, entry in enumerate(info.get("entries") or [], start=1):
         if not entry:
             continue
-        url = entry.get("webpage_url") or entry.get("url") or ""
+        url = _entry_url(info, entry)
         if not url:
             continue
         entries.append(
             PlaylistEntry(
-                index=position,
+                index=int(entry.get("playlist_index") or entry.get("index") or position),
                 title=str(entry.get("title") or f"Video {position}"),
                 url=str(url),
                 duration=entry.get("duration"),
             )
         )
     return entries
+
+
+def _entry_url(playlist_info: dict[str, Any], entry: dict[str, Any]) -> str:
+    """Get a downloadable URL from fields available in a flat yt-dlp playlist entry."""
+    for key in ("webpage_url", "original_url", "url"):
+        value = entry.get(key)
+        if isinstance(value, str) and urlparse(value).scheme in {"http", "https"}:
+            return value
+
+    video_id = entry.get("id") or entry.get("url")
+    extractor = str(entry.get("ie_key") or entry.get("extractor_key") or "").lower()
+    playlist_host = urlparse(str(playlist_info.get("webpage_url") or "")).netloc.lower()
+    if video_id and ("youtube" in extractor or playlist_host.endswith("youtube.com")):
+        return f"https://www.youtube.com/watch?{urlencode({'v': str(video_id)})}"
+    return ""
 
 
 def parse_selection(selection_str: str, total: int) -> list[int]:

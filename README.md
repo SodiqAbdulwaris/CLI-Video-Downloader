@@ -5,11 +5,18 @@ A CLI-based video downloader built with Python, `yt-dlp`, and `FFmpeg`. It allow
 ## Setup
 
 1. Create and activate a virtual environment.
-2. Install Python dependencies:
+2. Install backend dependencies:
 
 ```bash
+cd backend
 pip install -r requirements.txt
 ```
+
+## Project Structure
+
+- `backend/` contains the Python downloader application. `backend/api/` provides the FastAPI layer.
+- `frontend/` is reserved for a future React SPA and is not implemented yet.
+- `Downloads/` at the repository root is the legacy download directory. It is no longer used for new downloads and can be cleaned up manually when no longer needed.
 
 ## Install FFmpeg
 
@@ -46,28 +53,41 @@ sudo apt install ffmpeg
 ## How to use
 
 ```bash
+cd backend
 python main.py <youtube video or playlist link>
 ```
 
 OR
 
 ```bash
+cd backend
 python main.py
 ```
+
+## API server
+
+From `backend/`, start the local API server with:
+
+```bash
+python run_api.py
+```
+
+Interactive API documentation is available at `http://127.0.0.1:8000/docs`. The API exposes `POST /api/resolve`, `POST /api/download`, and `WS /api/ws/{job_id}`. `indices` supplied to a playlist download use the entry indices returned by `/api/resolve`.
 
 
 ## YouTube Cookie Authentication
 
-To reduce YouTube bot-detection errors, export a Netscape-format `cookies.txt` directly from a browser session logged into YouTube, for example with the "Get cookies.txt LOCALLY" extension, and place it at `config/cookies.txt`. Re-export it periodically because YouTube session cookies expire. Never share this file or commit it to git.
+To reduce YouTube bot-detection errors, export a Netscape-format `cookies.txt` directly from a browser session logged into YouTube, for example with the "Get cookies.txt LOCALLY" extension, and place it at `backend/config/cookies.txt`. Re-export it periodically because YouTube session cookies expire. Never share this file or commit it to git.
 
 ## Download Layout
 
 ```text
-Downloads/
-├── Single Videos/
-├── Shorts/
-└── Playlists/
-    └── Playlist_Title/
+<OS user Downloads>/
+└── YT-Video Downloader/
+    ├── Single Videos/
+    ├── Shorts/
+    └── Playlists/
+        └── Playlist_Title/
 ```
 
 ## Troubleshooting
@@ -75,6 +95,6 @@ Downloads/
 - `FFmpeg is not installed`: install FFmpeg and ensure it is available on `PATH`
 - `Invalid URL`: provide a full link
     - Get link by right clicking the video and clicking **Copy Video URL**
-- Successful downloads are recorded in `C:\Users\HP\Videos\CLI-Video-Downloads\download_history.log`
-- Playlist item failures: check `errors.log`; the downloader continues with remaining videos
+- Successful downloads are recorded in `<OS user Downloads>/YT-Video Downloader/download_history.log`
+- Playlist item failures: check `backend/errors.log`; the downloader continues with remaining videos
 - Missing output file after download: retry the download and verify the source URL is still available
