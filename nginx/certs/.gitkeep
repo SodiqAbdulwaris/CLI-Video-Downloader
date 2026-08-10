@@ -1,3 +1,0 @@
-# This file keeps the nginx/certs/ directory tracked by git.
-# The actual certificate files (*.pem, *-key.pem) are gitignored.
-# Generate them with mkcert — see README § mkcert Setup.

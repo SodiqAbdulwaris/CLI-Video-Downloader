@@ -1,7 +1,0 @@
-# backend/.dockerignore
-errors.log
-*.log
-__pycache__/
-*.pyc
-.venv/
-config/cookies.txt
