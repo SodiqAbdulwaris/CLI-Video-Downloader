@@ -19,6 +19,7 @@ interface MediaConfiguratorProps {
   onToggleIndex: (index: number) => void;
   onDownload: () => void;
   isDownloading: boolean;
+  downloadDirectory?: string | null;
 }
 
 export function MediaConfigurator({
@@ -32,7 +33,8 @@ export function MediaConfigurator({
   onSelectAll,
   onToggleIndex,
   onDownload,
-  isDownloading
+  isDownloading,
+  downloadDirectory
 }: MediaConfiguratorProps) {
   const isPlaylist = resolvedData.content_type === 'playlist';
   const isShort = !isPlaylist && (sourceUrl.includes('/shorts/') || resolvedData.title.toLowerCase().includes('#shorts'));
@@ -94,7 +96,7 @@ export function MediaConfigurator({
                     <FolderDown className="size-3.5 text-primary" /> Save to:
                   </span>
                   <code className="text-[11px] font-mono bg-background px-2 py-0.5 rounded border border-border/60 text-foreground truncate">
-                    ~/Downloads/YT-Video Downloader/{isShort ? 'Shorts/' : ''}
+                    {downloadDirectory || 'Not configured'}
                   </code>
                 </div>
               </div>

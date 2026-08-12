@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from config.settings import MAX_FILENAME_LENGTH, PLAYLISTS_DIR, SHORTS_DIR, SINGLE_VIDEOS_DIR
+from config.settings import MAX_FILENAME_LENGTH
+from services.settings_service import settings_service
 
 INVALID_FILENAME_CHARS = r'[\\/:*?"<>|]'
 
@@ -33,12 +34,13 @@ def ensure_unique_path(path: Path) -> Path:
         counter += 1
 
 
-def resolve_output_path(media_type: str, playlist_title: str | None = None) -> Path:
-    if media_type == "short":
-        return ensure_directory(SHORTS_DIR)
-    if media_type == "playlist":
-        return ensure_directory(PLAYLISTS_DIR / sanitize_name(playlist_title or "Playlist"))
-    return ensure_directory(SINGLE_VIDEOS_DIR)
+def resolve_output_path(media_type: str = "video", playlist_title: str | None = None) -> Path:
+    """Return the configured download directory.
+
+    All media (single videos, Shorts, playlists) is saved directly into this
+    directory — no per-type or per-playlist subfolders are created.
+    """
+    return ensure_directory(settings_service.require_target_download_dir())
 
 
 def temporary_prefix(directory: Path, base_name: str) -> Path:

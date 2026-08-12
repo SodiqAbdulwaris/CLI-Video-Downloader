@@ -14,13 +14,15 @@ interface DownloadCompleteDialogProps {
   jobStatus: JobStatus | null;
   jobItems: JobItem[];
   onDownloadAnother: () => void;
+  downloadDirectory?: string | null;
 }
 
 export function DownloadCompleteDialog({
   open,
   onOpenChange,
   jobItems,
-  onDownloadAnother
+  onDownloadAnother,
+  downloadDirectory
 }: DownloadCompleteDialogProps) {
   const totalCount = jobItems.length;
   const successfulCount = jobItems.filter(item => item.state === 'done').length;
@@ -111,8 +113,8 @@ export function DownloadCompleteDialog({
             <FolderOpen className="size-5 text-primary shrink-0" />
             <div>
               <span>{successfulCount > 0 ? 'Downloaded files can be found in:' : 'Files are saved to:'} </span>
-              <code className="font-mono font-bold text-foreground bg-background px-1.5 py-0.5 rounded border border-border/60">
-                Downloads/
+              <code className="font-mono font-bold text-foreground bg-background px-1.5 py-0.5 rounded border border-border/60 break-all">
+                {downloadDirectory || 'Downloads/'}
               </code>
             </div>
           </div>

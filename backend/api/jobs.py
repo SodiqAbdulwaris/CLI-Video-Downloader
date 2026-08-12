@@ -12,6 +12,7 @@ from api.thumbnail import extract_thumbnail
 from core.downloader import VideoDownloader
 from core.playlist import PlaylistEntry, get_playlist_entries
 from services.history_service import history_service
+from services.settings_service import settings_service
 
 logger = logging.getLogger(__name__)
 
@@ -304,7 +305,7 @@ class JobManager:
                 "total": completed_count + failed_count,
                 "successful": completed_count,
                 "failed": failed_count,
-                "downloadLocation": "Downloads/",
+                "downloadLocation": settings_service.get_download_directory() or "Downloads/",
                 "thumbnail": thumbnail,
                 "files": files_list,
             }

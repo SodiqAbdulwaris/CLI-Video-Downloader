@@ -8,9 +8,10 @@ import { DownloadsView } from './components/DownloadsView';
 import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
 import { DownloadCompleteDialog } from './components/DownloadCompleteDialog';
+import { DownloadLocationDialog } from './components/DownloadLocationDialog';
 import { useDownloadSocket } from './hooks/useDownloadSocket';
 import { useDownloadHistory } from './hooks/useDownloadHistory';
-import { resolveMedia, startDownload, API_BASE_URL } from './lib/api';
+import { resolveMedia, startDownload, getSettings, updateDownloadDirectory, API_BASE_URL } from './lib/api';
 import type { ResolvedMedia } from './types/download';
 import type { HistorySession } from './types/history';
 
@@ -28,6 +29,11 @@ export default function App() {
 
   // Server Connection Status
   const [serverStatus, setServerStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+
+  // Download location (persisted backend setting)
+  const [downloadDirectory, setDownloadDirectory] = useState<string | null>(null);
+  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
+  const [showLocationDialog, setShowLocationDialog] = useState(false);
 
   // History state
   const {
@@ -103,6 +109,34 @@ export default function App() {
     const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
   }, [checkHealth]);
+
+  // Load persisted download location; require setup when none is configured.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const settings = await getSettings();
+        if (cancelled) return;
+        setDownloadDirectory(settings.download_directory);
+      } catch {
+        // Backend unreachable — the server status indicator covers this; do not
+        // block the UI on a settings fetch failure.
+      } finally {
+        if (!cancelled) setIsSettingsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const saveDownloadDirectory = async (path: string) => {
+    const settings = await updateDownloadDirectory(path);
+    setDownloadDirectory(settings.download_directory);
+    if (settings.download_directory !== null) {
+      setShowLocationDialog(false);
+    }
+  };
 
   // Auto completion dialog & history refresh when job finishes
   useEffect(() => {
@@ -261,6 +295,10 @@ export default function App() {
   // Active jobs count badge for sidebar
   const activeJobsCount = (jobStatus === 'running' || jobStatus === 'queued') ? 1 : 0;
 
+  // Location dialog: forced setup on first run, editable later from Settings.
+  const isSetupDialog = downloadDirectory === null && !isSettingsLoading;
+  const isChangeDialog = showLocationDialog && downloadDirectory !== null;
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row transition-colors duration-200">
       {/* Desktop Persistent Sidebar & Mobile Drawer */}
@@ -322,6 +360,7 @@ export default function App() {
                   onToggleIndex={handleToggleIndex}
                   onDownload={handleDownload}
                   isDownloading={jobStatus === 'running' || jobStatus === 'queued'}
+                  downloadDirectory={downloadDirectory}
                 />
               )}
 
@@ -371,10 +410,22 @@ export default function App() {
               onToggleTheme={() => setIsDarkMode(!isDarkMode)}
               serverStatus={serverStatus}
               onCheckServerHealth={checkHealth}
+              downloadDirectory={downloadDirectory}
+              onChangeDownloadLocation={() => setShowLocationDialog(true)}
             />
           )}
         </main>
       </div>
+
+      {/* Download location setup / change dialog */}
+      <DownloadLocationDialog
+        open={isSetupDialog || isChangeDialog}
+        dismissible={isChangeDialog}
+        onOpenChange={(open) => {
+          if (!open && !isSetupDialog) setShowLocationDialog(false);
+        }}
+        onSave={saveDownloadDirectory}
+      />
 
       {/* Completion Modal */}
       <DownloadCompleteDialog
@@ -383,6 +434,7 @@ export default function App() {
         jobStatus={jobStatus}
         jobItems={jobItems}
         onDownloadAnother={handleReset}
+        downloadDirectory={downloadDirectory}
       />
     </div>
   );

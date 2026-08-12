@@ -21,6 +21,8 @@ interface SettingsViewProps {
   onToggleTheme: () => void;
   serverStatus: 'connected' | 'disconnected' | 'checking';
   onCheckServerHealth: () => void;
+  downloadDirectory: string | null;
+  onChangeDownloadLocation: () => void;
 }
 
 export function SettingsView({
@@ -28,6 +30,8 @@ export function SettingsView({
   onToggleTheme,
   serverStatus,
   onCheckServerHealth,
+  downloadDirectory,
+  onChangeDownloadLocation,
 }: SettingsViewProps) {
   const [openFolderAfter, setOpenFolderAfter] = useState<boolean>(() => {
     return localStorage.getItem('auto_open_folder') === 'true';
@@ -36,7 +40,6 @@ export function SettingsView({
   const [cookieStatus, setCookieStatus] = useState<'idle' | 'uploading' | 'imported' | 'error'>('idle');
   const [cookieFileName, setCookieFileName] = useState<string | null>(null);
   const [cookieFileSize, setCookieFileSize] = useState<number | null>(null);
-  const [cookieText] = useState<string>('');
   const [pingLatency, setPingLatency] = useState<number | null>(null);
   const [isPinging, setIsPinging] = useState(false);
 
@@ -164,37 +167,42 @@ export function SettingsView({
         </p>
       </div>
 
-      {/* SECTION 1: Downloads Configuration */}
+      {/* SECTION 1: Download Location */}
       <div className="p-4 sm:p-5 rounded-2xl bg-card border border-border/80 shadow-2xs flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <FolderDown className="size-4 text-primary" />
-          <h3 className="font-bold text-sm text-foreground">Downloads Folder</h3>
+          <h3 className="font-bold text-sm text-foreground">Download Location</h3>
         </div>
 
         <div className="flex flex-col gap-2.5 text-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-muted/40 border border-border/50">
-            <div className="flex flex-col gap-0.5">
-              <span className="font-semibold text-foreground">Default Download Path</span>
-              <span className="text-[11px] text-muted-foreground">Files are downloaded directly to your local user directory</span>
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="font-semibold text-foreground">Download location</span>
+              <span className="text-[11px] text-muted-foreground">
+                Future downloads are saved here. Changing it never moves or deletes existing files.
+              </span>
             </div>
-            <code className="font-mono text-xs bg-background px-2.5 py-1 rounded-lg border border-border/60 font-semibold text-primary shrink-0">
-              ~/Downloads/YT-Video Downloader/
+            <code className="font-mono text-xs bg-background px-2.5 py-1 rounded-lg border border-border/60 font-semibold text-primary shrink-0 max-w-full truncate">
+              {downloadDirectory || 'Not configured'}
             </code>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div className="p-2.5 rounded-xl bg-muted/20 border border-border/40 flex flex-col gap-0.5">
-              <span className="font-medium text-foreground text-[11px]">Single Videos</span>
-              <span className="font-mono text-[10px] text-muted-foreground truncate">/Single Videos/</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-muted/30 border border-border/40">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="font-medium text-foreground">Change where downloads are saved</span>
+              <span className="text-[11px] text-muted-foreground">
+                Videos, Shorts and playlists are all saved directly into this single folder.
+              </span>
             </div>
-            <div className="p-2.5 rounded-xl bg-muted/20 border border-border/40 flex flex-col gap-0.5">
-              <span className="font-medium text-foreground text-[11px]">Shorts</span>
-              <span className="font-mono text-[10px] text-muted-foreground truncate">/Shorts/</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-muted/20 border border-border/40 flex flex-col gap-0.5">
-              <span className="font-medium text-foreground text-[11px]">Playlists</span>
-              <span className="font-mono text-[10px] text-muted-foreground truncate">/Playlists/[Playlist Title]/</span>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onChangeDownloadLocation}
+              className="h-8 px-3 rounded-xl text-xs font-semibold gap-1.5 shrink-0"
+            >
+              <FolderDown className="size-3" />
+              <span>Change location</span>
+            </Button>
           </div>
 
           <label className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/40 cursor-pointer select-none">

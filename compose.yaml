@@ -6,13 +6,20 @@ services:
 
     environment:
       BGUTIL_BASE_URL: http://bgutil:4416
-      
+      # Container-side download directory (bind mount below). The backend never
+      # touches the host path directly; it only writes through this mount.
+      DOWNLOADS_ROOT: /downloads
+      # Host path that is bind-mounted to /downloads (set in .env). Used by the
+      # backend to display/validate the location the host admin configured.
+      DOWNLOADS_ROOT_HOST: ${DOWNLOADS_ROOT_HOST:-}
+
     ports:
       - "8000:8000"
 
     volumes:
       - ./backend/data:/app/backend/data
       - ./backend/config:/app/backend/config
+      - ${DOWNLOADS_ROOT_HOST:-./Downloads}:/downloads
 
   bgutil:
     image: brainicism/bgutil-ytdlp-pot-provider:1.3.1

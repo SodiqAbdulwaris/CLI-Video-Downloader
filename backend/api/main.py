@@ -10,9 +10,11 @@ from pathlib import Path
 
 from api.history import router as history_router
 from api.jobs import JobManager
+from api.settings import router as settings_router
 from api.thumbnail import extract_thumbnail
 from core.downloader import VideoDownloader, VideoDownloaderError
 from core.playlist import get_playlist_entries
+from services.settings_service import settings_service
 from utils.validators import is_valid_url
 
 app = FastAPI(title="YT-Video Downloader API")
@@ -24,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(history_router)
+app.include_router(settings_router)
 jobs = JobManager()
 
 
@@ -61,6 +64,14 @@ async def resolve(request: ResolveRequest) -> dict:
 async def download(request: DownloadRequest) -> dict[str, str]:
     if not is_valid_url(request.url):
         raise HTTPException(status_code=422, detail="Provide a valid http or https URL.")
+    if settings_service.get_download_directory() is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "A download location has not been configured yet. Open Settings and "
+                "choose where downloads should be saved before starting a download."
+            ),
+        )
     job = jobs.create_job(
         url=request.url,
         format_type=request.format_type,

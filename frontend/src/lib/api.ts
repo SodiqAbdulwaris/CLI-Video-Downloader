@@ -3,6 +3,10 @@ import type { HistorySession } from '../types/history';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
+export interface AppSettings {
+  download_directory: string | null;
+}
+
 export function getWsUrl(baseUrl: string, jobId: string): string {
   if (!baseUrl) {
     const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -83,4 +87,27 @@ export async function clearHistory(): Promise<void> {
   if (!response.ok) {
     throw new Error('Failed to clear download history.');
   }
+}
+
+export async function getSettings(): Promise<AppSettings> {
+  const response = await fetch(`${API_BASE_URL}/api/settings`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch application settings.');
+  }
+  return response.json();
+}
+
+export async function updateDownloadDirectory(download_directory: string): Promise<AppSettings> {
+  const response = await fetch(`${API_BASE_URL}/api/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ download_directory })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Failed to update the download location.');
+  }
+
+  return response.json();
 }
