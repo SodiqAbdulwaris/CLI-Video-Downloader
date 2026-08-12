@@ -2,7 +2,7 @@
 
 A full-stack, production-grade video and audio downloader powered by **Python (`yt-dlp` + `FFmpeg`)**, **FastAPI**, **React (Vite + Tailwind CSS)**, and **Nginx**.
 
-Whether you want to download a high-res 1080p video, convert a music video to MP3, download YouTube Shorts, or extract selective videos from a 50-item playlist, **YT-Video Downloader** handles it with real-time WebSocket progress updates and clean output organization on your local disk.
+Whether you want to download a high-res 1080p video, convert a music video to MP3, download YouTube Shorts, or extract selective videos from a 50-item playlist, **YT-Video Downloader** handles it with real-time WebSocket progress updates, persistent local download history, and clean output organization on your local disk.
 
 ---
 
@@ -15,17 +15,20 @@ Whether you want to download a high-res 1080p video, convert a music video to MP
 - **Audio-Only (MP3 Extraction)**: Automatically extracts audio streams and converts them into high-quality `.mp3` files using FFmpeg.
 
 ### ⚡ Key Capabilities
-- **Real-Time Live Progress**: Powered by WebSockets — monitor individual video progress percentages and overall playlist batch progress in real time.
-- **Automatic Audio/Video Stream Merging**: Merges best video and audio streams seamlessly via FFmpeg.
-- **YouTube Bot-Detection Prevention**: Integrated with `bgutil-ytdlp-pot-provider` for PO (Proof-of-Origin) Token generation and supports custom `cookies.txt` import.
-- **Local Host Downloads Integration**: Saves downloaded files directly to your machine's native `Downloads/YT-Video Downloader/` directory.
-- **Sleek Modern UI**: Responsive React interface with dark/light mode, thumbnail previews, resolution badges, and status logs.
-- **Locally-Trusted HTTPS**: Docker deployment uses `mkcert` for locally-trusted SSL certificates (`https://ytdownloader.local`).
+- **📜 Local Download History**: Persistent local JSON history tracking (`backend/data/download_history.json`). View your 5 most recent downloads on the homepage or open the full history view to inspect completed, partial, or failed sessions, view per-file details, re-trigger downloads, or delete history records without affecting downloaded files.
+- **⚡ Redownload Support**: Easily re-trigger past download sessions with original configuration settings (source URL, format, quality, playlist selection) creating a new history session entry.
+- **📡 Real-Time Live Progress**: Powered by WebSockets — monitor individual video progress percentages and overall playlist batch progress in real time.
+- **🎬 Automatic Audio/Video Stream Merging**: Merges best video and audio streams seamlessly via FFmpeg.
+- **🛡️ YouTube Bot-Detection Prevention**: Integrated with `bgutil-ytdlp-pot-provider` for PO (Proof-of-Origin) Token generation and supports custom `cookies.txt` import.
+- **📂 Local Host Downloads Integration**: Saves downloaded files directly to your machine's native `Downloads/YT-Video Downloader/` directory.
+- **🎨 Sleek Modern UI**: Responsive React interface with dark/light mode, thumbnail previews, resolution badges, recent download cards, history modal dialog, and status logs.
+- **🔒 Locally-Trusted HTTPS**: Docker deployment uses `mkcert` for locally-trusted SSL certificates (`https://ytdownloader.local`).
 
 ---
 
-## 📁 Download Directory Organization
+## 📁 Download Directory & Storage Organization
 
+### Downloaded Files Location
 Downloads land directly in your machine's **Downloads** folder, organized neatly by type:
 
 ```text
@@ -37,6 +40,17 @@ Downloads land directly in your machine's **Downloads** folder, organized neatly
         └── 📁 <Playlist Title>/# Individual playlist folders
     ├── 📄 download_history.log # Log of all completed downloads
 ```
+
+### Local History Storage
+Metadata for all download sessions is persisted locally on the machine running the backend:
+
+```text
+backend/data/download_history.json
+```
+
+- Created automatically if missing and survives application restarts.
+- Contains session metadata (ID, original URL, title, media type, format, resolution, completion time, status, per-file statuses, and errors).
+- Does **not** contain or copy raw video/audio files. Deleting history entries or clearing history only clears local JSON metadata and **never** deletes downloaded media files.
 
 ---
 
@@ -217,7 +231,28 @@ Frontend dev server will start on `http://localhost:5173`.
    - **Playlist**: Preview all playlist entries, use checkboxes to select specific videos or click **Select All**, and pick your target resolution.
 3. **Start Download**: Click **Start Download**.
 4. **Track Live Progress**: Watch the real-time progress bar and log console powered by WebSockets as streams are fetched, merged, or converted.
-5. **Access Your Files**: Open your system's `Downloads/YT-Video Downloader/` folder to view your newly downloaded media!
+5. **View Recent Downloads & Local History**:
+   - Scroll down to the **Recent Downloads** section to view your 5 most recent sessions.
+   - Click the **History** icon in the header (beside theme toggle) or click **View History →** to open the full history dialog.
+   - Click **Details** on any history item to see the original URL, target format/quality, saved location (`Downloads/`), and individual item download statuses or errors.
+   - Click **Redownload** to re-download a session using its original configuration.
+6. **Access Your Files**: Open your system's `Downloads/YT-Video Downloader/` folder to view your newly downloaded media!
+
+---
+
+## 📡 REST API & History Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Liveness health check probe |
+| `POST` | `/api/resolve` | Resolve video/playlist metadata & resolutions |
+| `POST` | `/api/download` | Queue a new download job |
+| `WS` | `/api/ws/{job_id}` | WebSocket live progress updates |
+| `GET` | `/api/history` | Retrieve full local download history |
+| `GET` | `/api/history/recent?limit=5` | Retrieve the 5 most recent download sessions |
+| `GET` | `/api/history/{id}` | Retrieve details for a specific history session |
+| `DELETE` | `/api/history/{id}` | Delete a single history entry (metadata only) |
+| `DELETE` | `/api/history` | Clear all download history records (metadata only) |
 
 ---
 
@@ -255,7 +290,7 @@ Browser (HTTPS)
 ```
 
 * **Nginx**: Acts as the sole public gateway on ports 80/443. Terminates TLS via `mkcert` certificates, serves built static React frontend assets, proxies `/api/*` REST endpoints, and proxies `/api/ws/*` WebSocket connections with HTTP Upgrade headers.
-* **Backend**: FastAPI app isolated inside `ytdl-net`. Runs `yt-dlp` and `FFmpeg` non-root inside the container.
+* **Backend**: FastAPI app isolated inside `ytdl-net`. Runs `yt-dlp` and `FFmpeg` non-root inside the container, managing download jobs and saving history metadata to `data/download_history.json`.
 * **bgutil-provider**: `brainicism/bgutil-ytdlp-pot-provider` container offering YouTube PO Token generation for `yt-dlp`.
 
 ---

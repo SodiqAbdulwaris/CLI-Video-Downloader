@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
+from api.thumbnail import extract_thumbnail
 from core.downloader import VideoDownloader
 from core.playlist import PlaylistEntry, get_playlist_entries
 from services.history_service import history_service
@@ -134,7 +135,7 @@ class JobManager:
 
             if media_type == "playlist":
                 title = str(listing_info.get("title") or "Playlist")
-                thumbnail = _extract_thumbnail(listing_info)
+                thumbnail = extract_thumbnail(listing_info)
                 entries = get_playlist_entries(listing_info)
                 positions = _select_positions(entries, job.requested_indices)
                 selected_entries = [entries[position] for position in positions]
@@ -194,7 +195,7 @@ class JobManager:
             else:
                 info = downloader.fetch_info(job.url)
                 title = str(info.get("title") or "video")
-                thumbnail = _extract_thumbnail(info)
+                thumbnail = extract_thumbnail(info)
                 duration = info.get("duration")
                 job.items = [JobItem(index=None, title=title)]
                 self._emit(job, {"type": "item", **asdict(job.items[0])})

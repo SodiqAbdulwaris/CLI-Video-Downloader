@@ -10,6 +10,7 @@ from pathlib import Path
 
 from api.history import router as history_router
 from api.jobs import JobManager
+from api.thumbnail import extract_thumbnail
 from core.downloader import VideoDownloader, VideoDownloaderError
 from core.playlist import get_playlist_entries
 from utils.validators import is_valid_url
@@ -103,26 +104,6 @@ async def job_events(websocket: WebSocket, job_id: str) -> None:
         return
 
 
-def _extract_thumbnail(info_dict: dict) -> str | None:
-    if not info_dict:
-        return None
-    thumb = info_dict.get("thumbnail")
-    if isinstance(thumb, str) and thumb:
-        return thumb
-    thumbnails = info_dict.get("thumbnails")
-    if isinstance(thumbnails, list) and thumbnails:
-        valid_thumbs = [t for t in thumbnails if isinstance(t, dict) and t.get("url")]
-        if valid_thumbs:
-            try:
-                sorted_thumbs = sorted(
-                    valid_thumbs,
-                    key=lambda x: int(x.get("width") or 0) * int(x.get("height") or 0),
-                    reverse=True
-                )
-                return sorted_thumbs[0]["url"]
-            except Exception:
-                return valid_thumbs[-1]["url"]
-    return None
 
 
 def _resolve(url: str) -> dict:
@@ -143,7 +124,7 @@ def _resolve(url: str) -> dict:
                 if re.get("title") == entry.title or re.get("webpage_url") == entry.url or re.get("url") == entry.url:
                     raw_match = re
                     break
-            thumb_url = _extract_thumbnail(raw_match) if raw_match else None
+            thumb_url = extract_thumbnail(raw_match) if raw_match else None
             resolved_entries.append({
                 "index": entry.index,
                 "title": entry.title,
@@ -162,6 +143,6 @@ def _resolve(url: str) -> dict:
         "content_type": content_type,
         "title": str(info.get("title") or "video"),
         "available_resolutions": downloader.list_available_resolutions(info),
-        "thumbnail": _extract_thumbnail(info),
+        "thumbnail": extract_thumbnail(info),
     }
 

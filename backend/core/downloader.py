@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,7 +57,21 @@ class VideoDownloader:
             "no_warnings": True,
             "socket_timeout": DEFAULT_TIMEOUT_SECONDS,
             "http_headers": {},
+            "js_runtimes": {"node": {}},
         }
+        
+        bgutil_url = os.getenv("BGUTIL_BASE_URL")
+
+        if bgutil_url:
+            self._base_options["extractor_args"] = {
+                "youtube": {
+                    "pot": {
+                        "provider": "bgutil:http",
+                        "base_url": bgutil_url,
+                    }
+                }
+            }
+        
         print(f"Cookies file: {COOKIES_FILE_PATH.resolve()}")
         if COOKIES_FILE_PATH.exists():
             self._base_options["cookiefile"] = str(COOKIES_FILE_PATH)
