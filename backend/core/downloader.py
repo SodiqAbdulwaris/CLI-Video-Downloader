@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -28,10 +28,21 @@ class DownloadContext:
 
 
 @dataclass(slots=True)
+class PlaylistItemResult:
+    index: int
+    title: str
+    filename: str | None
+    status: Literal["completed", "failed"]
+    duration: float | None
+    error: str | None
+
+
+@dataclass(slots=True)
 class PlaylistResult:
     completed: int
     failed: int
     failures: list[str]
+    item_results: list[PlaylistItemResult] = field(default_factory=list)
 
 
 ProgressHook = Callable[[dict[str, Any]], None]
@@ -208,6 +219,8 @@ class VideoDownloader:
         failures: list[str] = []
         completed = 0
 
+        item_results: list[PlaylistItemResult] = []
+
         for offset, index in enumerate(indices, start=1):
             entry = entries[index]
             print(f"Downloading video {offset} of {len(indices)}: {entry.title}")
@@ -220,7 +233,7 @@ class VideoDownloader:
                     preferred_res=resolution or "720p",
                     format_type=format_type,
                 )
-                self.download(
+                final_path = self.download(
                     url=entry.url,
                     selection=selected,
                     download_path=resolve_output_path(media_type="playlist", playlist_title=playlist_title),
@@ -234,10 +247,30 @@ class VideoDownloader:
                 completed += 1
                 if item_status_callback:
                     item_status_callback(entry, "done", None)
+                item_results.append(
+                    PlaylistItemResult(
+                        index=entry.index,
+                        title=entry.title,
+                        filename=final_path.name,
+                        status="completed",
+                        duration=entry.duration,
+                        error=None,
+                    )
+                )
             except Exception as exc:
                 failures.append(f"{entry.index}. {entry.title}: {exc}")
                 if item_status_callback:
                     item_status_callback(entry, "failed", str(exc))
+                item_results.append(
+                    PlaylistItemResult(
+                        index=entry.index,
+                        title=entry.title,
+                        filename=None,
+                        status="failed",
+                        duration=entry.duration,
+                        error=str(exc),
+                    )
+                )
                 log_error(
                     url=entry.url,
                     media_type="Playlist",
@@ -249,7 +282,7 @@ class VideoDownloader:
                     error_message=str(exc),
                 )
 
-        return PlaylistResult(completed=completed, failed=len(failures), failures=failures)
+        return PlaylistResult(completed=completed, failed=len(failures), failures=failures, item_results=item_results)
 
     def _download_once(
         self,

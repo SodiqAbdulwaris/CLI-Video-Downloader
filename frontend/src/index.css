@@ -20,6 +20,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand-red: var(--brand-red);
+  --color-brand-red-hover: var(--brand-red-hover);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -28,85 +30,103 @@
 
 :root {
   --background: hsl(0 0% 98%);
-  --foreground: hsl(0 0% 9%);
+  --foreground: hsl(240 10% 12%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(0 0% 9%);
+  --card-foreground: hsl(240 10% 12%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(0 0% 9%);
-  --primary: hsl(0 0% 9%);
-  --primary-foreground: hsl(0 0% 98%);
-  --secondary: hsl(0 0% 96%);
-  --secondary-foreground: hsl(0 0% 9%);
-  --muted: hsl(0 0% 96%);
-  --muted-foreground: hsl(0 0% 45%);
-  --accent: hsl(0 0% 94%);
-  --accent-foreground: hsl(0 0% 9%);
+  --popover-foreground: hsl(240 10% 12%);
+  
+  /* Primary Red Accent */
+  --brand-red: hsl(358 82% 52%);
+  --brand-red-hover: hsl(358 82% 46%);
+  
+  --primary: hsl(358 82% 52%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(240 5% 94%);
+  --secondary-foreground: hsl(240 10% 12%);
+  --muted: hsl(240 5% 94%);
+  --muted-foreground: hsl(240 4% 46%);
+  --accent: hsl(240 5% 92%);
+  --accent-foreground: hsl(240 10% 12%);
   --destructive: hsl(0 84.2% 60.2%);
   --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(0 0% 89%);
-  --input: hsl(0 0% 89%);
-  --ring: hsl(0 0% 9%);
-  --radius: 1.5rem;
+  --border: hsl(240 6% 90%);
+  --input: hsl(240 6% 90%);
+  --ring: hsl(358 82% 52%);
+  --radius: 0.875rem;
 }
 
 .dark {
-  --background: hsl(0 0% 6%);
+  --background: hsl(240 6% 8%);
   --foreground: hsl(0 0% 96%);
-  --card: hsl(0 0% 10%);
+  --card: hsl(240 6% 11%);
   --card-foreground: hsl(0 0% 96%);
-  --popover: hsl(0 0% 10%);
+  --popover: hsl(240 6% 11%);
   --popover-foreground: hsl(0 0% 96%);
-  --primary: hsl(0 0% 96%);
-  --primary-foreground: hsl(0 0% 10%);
-  --secondary: hsl(0 0% 16%);
+  
+  --brand-red: hsl(358 84% 56%);
+  --brand-red-hover: hsl(358 84% 48%);
+  
+  --primary: hsl(358 84% 56%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(240 5% 16%);
   --secondary-foreground: hsl(0 0% 96%);
-  --muted: hsl(0 0% 16%);
-  --muted-foreground: hsl(0 0% 60%);
-  --accent: hsl(0 0% 18%);
+  --muted: hsl(240 5% 15%);
+  --muted-foreground: hsl(240 4% 64%);
+  --accent: hsl(240 5% 18%);
   --accent-foreground: hsl(0 0% 96%);
   --destructive: hsl(0 62.8% 30.6%);
   --destructive-foreground: hsl(0 0% 96%);
-  --border: hsl(0 0% 18%);
-  --input: hsl(0 0% 18%);
-  --ring: hsl(0 0% 96%);
+  --border: hsl(240 4% 18%);
+  --input: hsl(240 4% 18%);
+  --ring: hsl(358 84% 56%);
 }
 
 body {
-  @apply bg-background text-foreground transition-colors duration-200 antialiased;
+  @apply bg-background text-foreground antialiased selection:bg-red-500/20 selection:text-red-500;
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Inter', 'Helvetica Neue', sans-serif;
 }
 
-/* Custom Editorial Elements */
-h1, h2, h3 {
+/* Typography polish */
+h1, h2, h3, h4 {
   text-wrap: balance;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.025em;
 }
 
-/* Bold headline formatting */
-.editorial-headline {
-  font-size: clamp(2.5rem, 5vw, 4.5rem);
-  font-weight: 800;
-  line-height: 0.95;
-  letter-spacing: -0.06em;
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-/* Custom rounded search container (pill shape) */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Pill Input Container */
 .pill-input-container {
   display: flex;
   align-items: center;
   background-color: var(--card);
-  border: 2px solid var(--primary);
-  border-radius: 9999px;
-  padding: 4px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
 }
 
 .pill-input-container:focus-within {
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 
-/* Grayscale overrides for scrollbar */
-* {
-  scrollbar-color: var(--border) transparent;
-}

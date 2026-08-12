@@ -1,23 +1,45 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Sidebar, type NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
-import { Hero } from './components/Hero';
 import { UrlResolver } from './components/UrlResolver';
 import { MediaConfigurator } from './components/MediaConfigurator';
-import { DownloadMonitor } from './components/DownloadMonitor';
+import { RecentDownloads } from './components/RecentDownloads';
+import { DownloadsView } from './components/DownloadsView';
+import { HistoryView } from './components/HistoryView';
+import { SettingsView } from './components/SettingsView';
 import { DownloadCompleteDialog } from './components/DownloadCompleteDialog';
-import { Footer } from './components/Footer';
 import { useDownloadSocket } from './hooks/useDownloadSocket';
-import { resolveMedia, startDownload } from './lib/api';
+import { useDownloadHistory } from './hooks/useDownloadHistory';
+import { resolveMedia, startDownload, API_BASE_URL } from './lib/api';
 import type { ResolvedMedia } from './types/download';
+import type { HistorySession } from './types/history';
 
 export default function App() {
-  // Theme state: default to Light Mode
+  // Theme state
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('theme');
-    return saved === 'dark';
+    if (saved) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
-  // UI / Media State
+  // App Shell navigation state
+  const [activeTab, setActiveTab] = useState<NavTab>('download');
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Server Connection Status
+  const [serverStatus, setServerStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+
+  // History state
+  const {
+    history,
+    recentHistory,
+    isLoading: isHistoryLoading,
+    refetchHistory,
+    removeSession,
+    clearAllHistory,
+  } = useDownloadHistory();
+
+  // Media / Resolve State
   const [url, setUrl] = useState('');
   const [isResolving, setIsResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
@@ -28,11 +50,11 @@ export default function App() {
   const [resolution, setResolution] = useState<string>('');
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
 
-  // Completion dialog state
+  // Completion Dialog State
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const completedJobIdRef = useRef<string | null>(null);
 
-  // WebSocket / Job state hook
+  // WebSocket / Download Hook
   const {
     jobId,
     setJobId,
@@ -51,7 +73,7 @@ export default function App() {
     resetSocketState
   } = useDownloadSocket();
 
-  // Apply theme class
+  // Apply Dark/Light theme class to html element
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -62,18 +84,39 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  // Trigger completion modal when job finishes
+  // Check Backend Server Health
+  const checkHealth = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`);
+      if (response.ok) {
+        setServerStatus('connected');
+      } else {
+        setServerStatus('disconnected');
+      }
+    } catch {
+      setServerStatus('disconnected');
+    }
+  }, []);
+
+  useEffect(() => {
+    checkHealth();
+    const interval = setInterval(checkHealth, 30000);
+    return () => clearInterval(interval);
+  }, [checkHealth]);
+
+  // Auto completion dialog & history refresh when job finishes
   useEffect(() => {
     if (jobId && (jobStatus === 'completed' || jobStatus === 'failed')) {
       if (completedJobIdRef.current !== jobId) {
         completedJobIdRef.current = jobId;
+        refetchHistory();
         const timer = setTimeout(() => {
           setShowCompletionDialog(true);
-        }, 100);
+        }, 300);
         return () => clearTimeout(timer);
       }
     }
-  }, [jobId, jobStatus]);
+  }, [jobId, jobStatus, refetchHistory]);
 
   // Playlist selection helpers
   const handleSelectAll = () => {
@@ -101,20 +144,18 @@ export default function App() {
     setResolvedData(null);
     completedJobIdRef.current = null;
     setShowCompletionDialog(false);
-    resetSocketState();
 
     try {
       const data = await resolveMedia(url.trim());
       setResolvedData(data);
       setSelectedIndices(data.entries ? data.entries.map(e => e.index) : []);
-      // Default to highest resolution if available
       if (data.available_resolutions && data.available_resolutions.length > 0) {
         setResolution(data.available_resolutions[0]);
       } else {
         setResolution('');
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'An unexpected error occurred while resolving the URL. Please verify the URL and try again.';
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred while resolving the URL.';
       setResolveError(message);
     } finally {
       setIsResolving(false);
@@ -144,10 +185,63 @@ export default function App() {
       const { job_id } = await startDownload(payload);
       setJobId(job_id);
       connect(job_id);
+      // Automatically switch to Downloads queue manager view
+      setActiveTab('downloads');
     } catch (err: unknown) {
       setJobStatus('failed');
-      const message = err instanceof Error ? err.message : 'Failed to start download. Please try again.';
+      const message = err instanceof Error ? err.message : 'Failed to start download.';
       setJobError(message);
+    }
+  };
+
+  // Redownload Session from History
+  const handleRedownloadSession = async (session: HistorySession) => {
+    if (!session.sourceUrl) return;
+
+    const targetUrl = session.sourceUrl;
+    setUrl(targetUrl);
+    setIsResolving(true);
+    setResolveError(null);
+    setResolvedData(null);
+    completedJobIdRef.current = null;
+    setShowCompletionDialog(false);
+    resetSocketState();
+
+    try {
+      const data = await resolveMedia(targetUrl);
+      setResolvedData(data);
+
+      const targetFormat = session.format || 'video';
+      const targetRes = session.resolution || (data.available_resolutions?.[0] ?? null);
+      const targetIndices = session.requestedIndices ?? (data.entries ? data.entries.map(e => e.index) : null);
+
+      setFormatType(targetFormat);
+      setResolution(targetRes || '');
+      setSelectedIndices(targetIndices || []);
+
+      setJobStatus('queued');
+      setJobError(null);
+      setJobItems([]);
+      setProgressMap({});
+      setSocketLogs([]);
+
+      const payload = {
+        url: targetUrl,
+        format_type: targetFormat,
+        resolution: targetFormat === 'video' ? targetRes : null,
+        indices: data.content_type === 'playlist' ? targetIndices : null
+      };
+
+      const { job_id } = await startDownload(payload);
+      setJobId(job_id);
+      connect(job_id);
+      setActiveTab('downloads');
+    } catch (err: unknown) {
+      setJobStatus('failed');
+      const message = err instanceof Error ? err.message : 'Failed to start redownload job.';
+      setJobError(message);
+    } finally {
+      setIsResolving(false);
     }
   };
 
@@ -161,42 +255,90 @@ export default function App() {
     setSelectedIndices([]);
     setResolveError(null);
     resetSocketState();
+    setActiveTab('download');
   };
 
+  // Active jobs count badge for sidebar
+  const activeJobsCount = (jobStatus === 'running' || jobStatus === 'queued') ? 1 : 0;
+
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-200 flex flex-col">
-      <div className="w-full max-w-4xl mx-auto px-4 sm:px-8 flex flex-col flex-1 gap-6">
-        <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} />
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row transition-colors duration-200">
+      {/* Desktop Persistent Sidebar & Mobile Drawer */}
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isDarkMode={isDarkMode}
+        onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+        serverStatus={serverStatus}
+        activeJobsCount={activeJobsCount}
+        mobileOpen={mobileOpen}
+        onMobileToggle={setMobileOpen}
+      />
 
-        <Hero />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+        <Header
+          activeTab={activeTab}
+          onMobileMenuOpen={() => setMobileOpen(true)}
+          isDarkMode={isDarkMode}
+          onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+          serverStatus={serverStatus}
+        />
 
-        <main className="flex-1 flex flex-col gap-6">
-          <UrlResolver
-            url={url}
-            onUrlChange={setUrl}
-            onResolve={handleResolve}
-            isResolving={isResolving}
-            resolveError={resolveError}
-            isDisabled={jobStatus === 'running' || jobStatus === 'queued'}
-          />
+        <main className="flex-1 p-4 sm:p-8 max-w-5xl w-full mx-auto flex flex-col gap-6">
+          {/* TAB 1: DOWNLOAD (Dashboard view) */}
+          {activeTab === 'download' && (
+            <div className="flex flex-col gap-6 w-full animate-in fade-in duration-200">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                  Download from YouTube
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Videos, playlists & audio — downloaded directly to your local machine.
+                </p>
+              </div>
 
-          {resolvedData && (
-            <MediaConfigurator
-              resolvedData={resolvedData}
-              formatType={formatType}
-              resolution={resolution}
-              selectedIndices={selectedIndices}
-              onFormatChange={setFormatType}
-              onResolutionChange={setResolution}
-              onSelectAll={handleSelectAll}
-              onToggleIndex={handleToggleIndex}
-              onDownload={handleDownload}
-              isDownloading={jobStatus === 'running' || jobStatus === 'queued'}
-            />
+              {/* Primary URL Input Resolver */}
+              <UrlResolver
+                url={url}
+                onUrlChange={setUrl}
+                onResolve={handleResolve}
+                isResolving={isResolving}
+                resolveError={resolveError}
+                isDisabled={jobStatus === 'running' || jobStatus === 'queued'}
+              />
+
+              {/* Resolved Media Configurator */}
+              {resolvedData && (
+                <MediaConfigurator
+                  resolvedData={resolvedData}
+                  sourceUrl={url}
+                  formatType={formatType}
+                  resolution={resolution}
+                  selectedIndices={selectedIndices}
+                  onFormatChange={setFormatType}
+                  onResolutionChange={setResolution}
+                  onSelectAll={handleSelectAll}
+                  onToggleIndex={handleToggleIndex}
+                  onDownload={handleDownload}
+                  isDownloading={jobStatus === 'running' || jobStatus === 'queued'}
+                />
+              )}
+
+              {/* Recent Downloads Section */}
+              <RecentDownloads
+                recentHistory={recentHistory}
+                onOpenFullHistory={() => setActiveTab('history')}
+                onRedownload={handleRedownloadSession}
+                onViewDetails={() => setActiveTab('history')}
+                isLoading={isHistoryLoading}
+              />
+            </div>
           )}
 
-          {jobStatus && (
-            <DownloadMonitor
+          {/* TAB 2: DOWNLOADS (Active & Completed Download Manager) */}
+          {activeTab === 'downloads' && (
+            <DownloadsView
               jobId={jobId}
               jobStatus={jobStatus}
               jobError={jobError}
@@ -207,13 +349,34 @@ export default function App() {
               resolvedData={resolvedData}
               selectedIndices={selectedIndices}
               onReset={handleReset}
+              onNavigateToDownload={() => setActiveTab('download')}
+            />
+          )}
+
+          {/* TAB 3: HISTORY (Full History Screen) */}
+          {activeTab === 'history' && (
+            <HistoryView
+              history={history}
+              onRedownloadSession={handleRedownloadSession}
+              onDeleteSession={removeSession}
+              onClearHistory={clearAllHistory}
+              isLoading={isHistoryLoading}
+            />
+          )}
+
+          {/* TAB 4: SETTINGS (Application Settings Screen) */}
+          {activeTab === 'settings' && (
+            <SettingsView
+              isDarkMode={isDarkMode}
+              onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+              serverStatus={serverStatus}
+              onCheckServerHealth={checkHealth}
             />
           )}
         </main>
-
-        <Footer />
       </div>
 
+      {/* Completion Modal */}
       <DownloadCompleteDialog
         open={showCompletionDialog}
         onOpenChange={setShowCompletionDialog}

@@ -39,3 +39,5 @@ async def delete_history_session(session_id: str) -> dict:
     if not deleted:
         raise HTTPException(status_code=404, detail="History session not found.")
     return {"success": True, "message": "History session deleted successfully."}
+
+   

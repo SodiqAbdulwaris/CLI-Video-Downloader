@@ -1,4 +1,5 @@
 import type { ResolvedMedia, StartDownloadRequest, StartDownloadResponse } from '../types/download';
+import type { HistorySession } from '../types/history';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -40,4 +41,46 @@ export async function startDownload(payload: StartDownloadRequest): Promise<Star
   }
 
   return response.json();
+}
+
+export async function getHistory(): Promise<HistorySession[]> {
+  const response = await fetch(`${API_BASE_URL}/api/history`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch download history.');
+  }
+  return response.json();
+}
+
+export async function getRecentHistory(limit = 5): Promise<HistorySession[]> {
+  const response = await fetch(`${API_BASE_URL}/api/history/recent?limit=${limit}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch recent download history.');
+  }
+  return response.json();
+}
+
+export async function getHistorySession(id: string): Promise<HistorySession> {
+  const response = await fetch(`${API_BASE_URL}/api/history/${id}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch history session details.');
+  }
+  return response.json();
+}
+
+export async function deleteHistorySession(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/history/${id}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete history entry.');
+  }
+}
+
+export async function clearHistory(): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/history`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) {
+    throw new Error('Failed to clear download history.');
+  }
 }

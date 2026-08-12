@@ -17,7 +17,7 @@ _file_lock = Lock()
 
 
 def _ensure_data_dir() -> None:
-    DATA_DIR.mkdir(parents, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     gitkeep_path = DATA_DIR / ".gitkeep"
     if not gitkeep_path.exists():
         gitkeep_path.touch()

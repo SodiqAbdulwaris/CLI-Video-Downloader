@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from pathlib import Path
 
+from api.history import router as history_router
 from api.jobs import JobManager
 from core.downloader import VideoDownloader, VideoDownloaderError
 from core.playlist import get_playlist_entries
@@ -20,6 +22,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(history_router)
 jobs = JobManager()
 
 
@@ -65,6 +68,22 @@ async def download(request: DownloadRequest) -> dict[str, str]:
     )
     return {"job_id": job.id}
 
+ 
+
+@app.post("/api/cookies")
+async def upload_cookies(file: UploadFile = File(...)):
+    config_dir = Path(__file__).resolve().parent.parent / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    cookies_path = config_dir / "cookies.txt"
+
+    content = await file.read()
+    cookies_path.write_bytes(content)
+
+    return {
+        "success": True,
+        "filename": file.filename,
+    }
 
 @app.websocket("/api/ws/{job_id}")
 async def job_events(websocket: WebSocket, job_id: str) -> None:

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
 from core.downloader import VideoDownloader
 from core.playlist import PlaylistEntry, get_playlist_entries
+from services.history_service import history_service
+
+logger = logging.getLogger(__name__)
 
 JobStatus = Literal["queued", "running", "completed", "failed"]
 ItemState = Literal["queued", "downloading", "done", "failed"]
@@ -113,12 +118,23 @@ class JobManager:
     def _run_download(self, job: DownloadJob) -> None:
         job.status = "running"
         self._emit(job, {"type": "job", "status": "running", "job_id": job.id})
+        start_time = datetime.now(timezone.utc).isoformat()
+
+        title = "Download"
+        thumbnail = None
+        media_type = "video"
+        files_list: list[dict[str, Any]] = []
+        completed_count = 0
+        failed_count = 0
+
         try:
             downloader = VideoDownloader()
             listing_info = downloader.fetch_playlist_listing(job.url)
             media_type = downloader.detect_type(listing_info)
 
             if media_type == "playlist":
+                title = str(listing_info.get("title") or "Playlist")
+                thumbnail = _extract_thumbnail(listing_info)
                 entries = get_playlist_entries(listing_info)
                 positions = _select_positions(entries, job.requested_indices)
                 selected_entries = [entries[position] for position in positions]
@@ -137,8 +153,32 @@ class JobManager:
                         job, entry, state, error
                     ),
                 )
+                completed_count = result.completed
+                failed_count = result.failed
+                files_list = [
+                    {
+                        "title": item.title,
+                        "filename": item.filename,
+                        "status": item.status,
+                        "duration": item.duration,
+                        "resolution": job.resolution,
+                        "error": item.error,
+                    }
+                    for item in result.item_results
+                ]
+
                 if result.failed:
                     job.status = "failed"
+                    self._save_history(
+                        job=job,
+                        start_time=start_time,
+                        title=title,
+                        media_type=media_type,
+                        thumbnail=thumbnail,
+                        files_list=files_list,
+                        completed_count=completed_count,
+                        failed_count=failed_count,
+                    )
                     self._emit(
                         job,
                         {
@@ -154,11 +194,13 @@ class JobManager:
             else:
                 info = downloader.fetch_info(job.url)
                 title = str(info.get("title") or "video")
+                thumbnail = _extract_thumbnail(info)
+                duration = info.get("duration")
                 job.items = [JobItem(index=None, title=title)]
                 self._emit(job, {"type": "item", **asdict(job.items[0])})
                 job.items[0].state = "downloading"
                 self._emit(job, {"type": "item", **asdict(job.items[0])})
-                downloader.download(
+                final_path = downloader.download(
                     url=job.url,
                     selection=None,
                     download_path=None,
@@ -170,14 +212,104 @@ class JobManager:
                 job.items[0].state = "done"
                 self._emit(job, {"type": "item", **asdict(job.items[0])})
 
+                completed_count = 1
+                failed_count = 0
+                files_list = [
+                    {
+                        "title": title,
+                        "filename": final_path.name,
+                        "status": "completed",
+                        "duration": duration,
+                        "resolution": job.resolution,
+                        "error": None,
+                    }
+                ]
+
             job.status = "completed"
+            self._save_history(
+                job=job,
+                start_time=start_time,
+                title=title,
+                media_type=media_type,
+                thumbnail=thumbnail,
+                files_list=files_list,
+                completed_count=completed_count,
+                failed_count=failed_count,
+            )
             self._emit(job, {"type": "job", "status": "completed", "job_id": job.id})
         except Exception as exc:
             job.status = "failed"
+            completed_count = 0
+            failed_count = len(job.items) if job.items else 1
+            if not files_list:
+                files_list = [
+                    {
+                        "title": item.title if hasattr(item, "title") else title,
+                        "filename": None,
+                        "status": "failed",
+                        "duration": None,
+                        "resolution": job.resolution,
+                        "error": str(exc),
+                    }
+                    for item in (job.items if job.items else [JobItem(index=None, title=title)])
+                ]
+            self._save_history(
+                job=job,
+                start_time=start_time,
+                title=title,
+                media_type=media_type,
+                thumbnail=thumbnail,
+                files_list=files_list,
+                completed_count=completed_count,
+                failed_count=failed_count,
+            )
             self._emit(
                 job,
                 {"type": "job", "status": "failed", "job_id": job.id, "error": str(exc)},
             )
+
+    def _save_history(
+        self,
+        *,
+        job: DownloadJob,
+        start_time: str,
+        title: str,
+        media_type: str,
+        thumbnail: str | None,
+        files_list: list[dict[str, Any]],
+        completed_count: int,
+        failed_count: int,
+    ) -> None:
+        try:
+            if completed_count > 0 and failed_count == 0:
+                status = "completed"
+            elif completed_count > 0 and failed_count > 0:
+                status = "partial"
+            else:
+                status = "failed"
+
+            completed_at = datetime.now(timezone.utc).isoformat()
+            session = {
+                "id": job.id,
+                "createdAt": start_time,
+                "completedAt": completed_at,
+                "sourceUrl": job.url,
+                "title": title,
+                "type": media_type,
+                "format": job.format_type,
+                "resolution": job.resolution,
+                "requestedIndices": job.requested_indices,
+                "status": status,
+                "total": completed_count + failed_count,
+                "successful": completed_count,
+                "failed": failed_count,
+                "downloadLocation": "Downloads/",
+                "thumbnail": thumbnail,
+                "files": files_list,
+            }
+            history_service.add_history_session(session)
+        except Exception as exc:
+            logger.error("Failed to persist download history: %s", exc)
 
 
 def _select_positions(entries: list[PlaylistEntry], requested_indices: list[int] | None) -> list[int]:

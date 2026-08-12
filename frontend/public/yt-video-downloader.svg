@@ -1,0 +1,11 @@
+<svg viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg">
+  <!-- Play button, filling most of the canvas -->
+  <rect x="10" y="70" width="400" height="280" rx="48" fill="#E63946"/>
+  <path d="M150 150 L270 210 L150 270 Z" fill="#FFFFFF"/>
+
+  <!-- Download badge, overlapping bottom-right, extending to canvas edges -->
+  <circle cx="345" cy="345" r="75" fill="#191919"/>
+  <circle cx="345" cy="345" r="63" fill="#6B7280"/>
+  <path d="M345 312 L345 362 M345 362 L323 340 M345 362 L367 340" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="320" y="374" width="50" height="12" rx="6" fill="#FFFFFF"/>
+</svg>
