@@ -196,19 +196,88 @@ The backend runs `yt-dlp` and `FFmpeg` to fetch and merge streams, manages downl
 
 ## Docker
 
-The backend, and only the backend, can run in Docker.
+Only the backend runs in Docker. The frontend always runs natively with `npm run dev`, even when the backend is containerized.
+
+### Prerequisites
+
+Docker Desktop, with the WSL2 backend on Windows or a native Docker engine on macOS/Linux.
+
+### Setup
+
+1. Copy the example environment file, if you haven't already:
+
+```bash
+cp .env.example .env
+```
+
+2. Open `.env` and set `DOWNLOADS_ROOT_HOST` to an absolute path on your machine, for example:
+
+```env
+DOWNLOADS_ROOT_HOST=C:/Users/YourName/Downloads
+```
+
+This is required; `docker compose up` refuses to start without it. Don't use a shell variable like `${HOME}` here, it isn't set on native Windows and resolves to an empty value, which silently points the app at the wrong folder.
+
+3. Build and start the backend:
 
 ```bash
 docker compose up -d --build
 ```
 
-Stop it with:
+This builds the backend image, starts the backend container, and starts a `bgutil` sidecar container that generates YouTube PO tokens to reduce bot-detection errors. The API is now available at `http://127.0.0.1:8000`.
+
+4. Confirm it's running:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+This should return `{"status":"ok"}`.
+
+5. In a separate terminal, start the frontend exactly as in Usage, Web App:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open `http://localhost:5173`. In the app, set your download location to the exact same path you set for `DOWNLOADS_ROOT_HOST`. The backend enforces this while running in Docker, since it only ever writes through the bind mount described below; a mismatch is rejected with a clear error (see Troubleshooting).
+
+### Common commands
+
+| Command | What it does |
+|---|---|
+| `docker compose up -d --build` | Build the image if needed, then start the containers in the background |
+| `docker compose down` | Stop and remove the containers |
+| `docker compose logs backend` | View backend logs |
+| `docker compose logs bgutil` | View the PO token provider's logs |
+| `docker compose restart backend` | Restart the backend without rebuilding |
+| `docker compose up -d --build backend` | Rebuild just the backend after a code change |
+| `docker compose config` | Print the fully resolved configuration, useful for checking what `DOWNLOADS_ROOT_HOST` actually resolved to |
+
+### Volumes
+
+`compose.yaml` mounts three things into the backend container:
+
+| Host path | Container path | Purpose |
+|---|---|---|
+| `./backend/data` | `/app/backend/data` | Download history and settings, so they survive container restarts and rebuilds |
+| `./backend/config` | `/app/backend/config` | `cookies.txt`, so it can be added or updated without rebuilding the image |
+| `DOWNLOADS_ROOT_HOST` (from `.env`) | `/downloads` | Where downloaded files are actually written |
+
+The backend never writes to a host path directly. It only ever writes through the `/downloads` mount, which is why `DOWNLOADS_ROOT_HOST` is required and why the download location chosen in the app has to match it exactly.
+
+### Rebuilding after a code change
+
+`docker compose up -d --build` picks up backend code changes and rebuilds the image. It doesn't reinstall dependencies unless `pyproject.toml` or `uv.lock` changed, since Docker caches that layer separately.
+
+### Stopping
 
 ```bash
 docker compose down
 ```
 
-`compose.yaml` mounts three volumes: `backend/data` for history and settings, `backend/config` for cookies, and your host download folder (`DOWNLOADS_ROOT_HOST`) at `/downloads` inside the container. The frontend still runs natively with `npm run dev` even when the backend is containerized.
+This stops and removes the containers but leaves the three mounted volumes, and everything in them, untouched.
 
 ## Troubleshooting
 
