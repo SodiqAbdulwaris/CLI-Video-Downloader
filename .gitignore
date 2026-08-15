@@ -10,7 +10,8 @@ nginx/certs/*-key.pem
 # ── Project ────────────────────────────────────────────────────────────────────
 .qodo/
 .venv/
-docs/
+docs/*
+!docs/agent-log/
 imgs/
 
 __pycache__/
