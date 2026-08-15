@@ -71,7 +71,7 @@ Choose one of the two setup paths below:
 The backend (FastAPI + yt-dlp + the PO token provider) runs in Docker; the frontend runs natively with Vite.
 
 #### Step 1: Configure `.env` File
-Copy the example environment file and, optionally, set `DOWNLOADS_ROOT_HOST` to the host folder you want bind-mounted into the container (defaults to `./Downloads` if left unset):
+Copy the example environment file and set `DOWNLOADS_ROOT_HOST` to the host folder you want bind-mounted into the container. This is **required** — `docker compose up` will refuse to start without it:
 
 * **Windows (PowerShell)**:
   ```powershell
@@ -102,7 +102,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Frontend dev server will start on `http://localhost:5173`.
+Frontend dev server will start on `http://localhost:5173`. The dev server proxies `/api` and `/health` to `http://127.0.0.1:8000` by default, so no frontend config is needed as long as the backend is on its default port. If your backend runs elsewhere (a different port, or Docker on another host), copy `frontend/.env.example` to `frontend/.env` and set `VITE_API_BASE_URL` to that backend's URL.
 
 #### Step 4: Configure the Download Location
 Open the app and, in the first-run dialog (or Settings → Download Location), enter the **same path you set for `DOWNLOADS_ROOT_HOST`** — the backend only writes through that bind mount.
@@ -148,7 +148,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Frontend dev server will start on `http://localhost:5173`.
+Frontend dev server will start on `http://localhost:5173`, proxying `/api` and `/health` to `http://127.0.0.1:8000` by default (see the note in Method A, Step 3, if your backend runs elsewhere).
 
 ---
 
@@ -211,13 +211,13 @@ http://localhost:8000  ─────────────►  ┌───�
                                         └────────────┬──────────────┘
                                                       │ BGUTIL_BASE_URL
                                         ┌─────────────▼─────────────┐
-                                        │  bgutil-provider :4416    │
+                                        │      bgutil :4416         │
                                         │  (Docker only)             │
                                         └────────────────────────────┘
 ```
 
 * **Backend**: FastAPI app running `yt-dlp` and `FFmpeg`, managing download jobs over WebSocket and persisting history/settings to `backend/data/*.json`. Runs on port 8000 either via Docker (`compose.yaml`) or natively (`run_api.py`).
-* **bgutil-provider**: `brainicism/bgutil-ytdlp-pot-provider` container offering YouTube PO Token generation for `yt-dlp`. Only present in the Docker setup (Method A); native-only setups run without it.
+* **bgutil**: the Compose service name for the `brainicism/bgutil-ytdlp-pot-provider` container, offering YouTube PO Token generation for `yt-dlp`. The backend finds it via `BGUTIL_BASE_URL=http://bgutil:4416` (Docker's internal DNS resolves `bgutil` to this container). Only present in the Docker setup (Method A) — use `docker compose logs bgutil` to inspect it; native-only setups run without it.
 * **Frontend**: React SPA served by the Vite dev server (or a static build) — never containerized, and talks to the backend directly over plain HTTP/WS.
 
 ---
