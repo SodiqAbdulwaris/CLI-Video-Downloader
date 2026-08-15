@@ -160,7 +160,7 @@ export function SettingsView({
       <div className="border-b border-border/60 pb-4">
         <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <SettingsIcon className="size-5 text-primary" />
-          <span>Application Settings</span>
+          <span>Settings</span>
         </h2>
         <p className="text-xs text-muted-foreground mt-0.5">
           Manage local storage paths, visual appearance, server status, and cookies configuration
