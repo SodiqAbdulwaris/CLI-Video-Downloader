@@ -11,4 +11,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    // Proxies the backend so the dev server works with zero config when the
+    // backend runs on its default http://127.0.0.1:8000. Override by setting
+    // VITE_API_BASE_URL (see .env.example) if the backend runs elsewhere.
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true, ws: true },
+      '/health': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+    },
+  },
 })

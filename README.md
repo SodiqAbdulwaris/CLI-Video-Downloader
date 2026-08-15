@@ -1,6 +1,6 @@
 # 🎬 YT-Video Downloader
 
-A full-stack, production-grade video and audio downloader powered by **Python (`yt-dlp` + `FFmpeg`)**, **FastAPI**, **React (Vite + Tailwind CSS)**, and **Nginx**.
+A full-stack video and audio downloader powered by **Python (`yt-dlp` + `FFmpeg`)**, **FastAPI**, and **React (Vite + Tailwind CSS)**.
 
 Whether you want to download a high-res 1080p video, convert a music video to MP3, download YouTube Shorts, or extract selective videos from a 50-item playlist, **YT-Video Downloader** handles it with real-time WebSocket progress updates, persistent local download history, and clean output organization on your local disk.
 
@@ -10,7 +10,7 @@ Whether you want to download a high-res 1080p video, convert a music video to MP
 
 ### 📹 Supported Media Types
 - **Single YouTube Videos**: Download standard videos up to 4K resolution (720p, 1080p, 1440p, 2160p depending on source availability).
-- **YouTube Shorts**: Automatically detected and saved into a dedicated `Shorts/` folder.
+- **YouTube Shorts**: Automatically detected and downloaded like any other single video.
 - **Full & Partial Playlists**: Paste a playlist link to inspect all items, select/deselect specific videos, pick a uniform target resolution, and batch download.
 - **Audio-Only (MP3 Extraction)**: Automatically extracts audio streams and converts them into high-quality `.mp3` files using FFmpeg.
 
@@ -20,26 +20,17 @@ Whether you want to download a high-res 1080p video, convert a music video to MP
 - **📡 Real-Time Live Progress**: Powered by WebSockets — monitor individual video progress percentages and overall playlist batch progress in real time.
 - **🎬 Automatic Audio/Video Stream Merging**: Merges best video and audio streams seamlessly via FFmpeg.
 - **🛡️ YouTube Bot-Detection Prevention**: Integrated with `bgutil-ytdlp-pot-provider` for PO (Proof-of-Origin) Token generation and supports custom `cookies.txt` import.
-- **📂 Local Host Downloads Integration**: Saves downloaded files directly to your machine's native `Downloads/YT-Video Downloader/` directory.
+- **📂 Configurable Download Location**: Choose the destination folder from the app's Settings screen on first run (or change it any time) — no hard-coded path.
 - **🎨 Sleek Modern UI**: Responsive React interface with dark/light mode, thumbnail previews, resolution badges, recent download cards, history modal dialog, and status logs.
-- **🔒 Locally-Trusted HTTPS**: Docker deployment uses `mkcert` for locally-trusted SSL certificates (`https://ytdownloader.local`).
 
 ---
 
 ## 📁 Download Directory & Storage Organization
 
 ### Downloaded Files Location
-Downloads land directly in your machine's **Downloads** folder, organized neatly by type:
+On first run, the app asks you to choose a download folder (Settings → Download Location). Every video, Short, and playlist item is saved directly into that single folder — no per-type or per-playlist subfolders. Existing files are never moved or deleted when you change the location later.
 
-```text
-📁 Your User Downloads/
-└── 📁 YT-Video Downloader/
-    ├── 📁 Single Videos/       # Standard YouTube video downloads (.mp4)
-    ├── 📁 Shorts/              # YouTube Shorts downloads (.mp4)
-    └── 📁 Playlists/           # Playlist downloads
-        └── 📁 <Playlist Title>/# Individual playlist folders
-    ├── 📄 download_history.log # Log of all completed downloads
-```
+Running via Docker? The folder you pick must be the one bind-mounted into the container — see `DOWNLOADS_ROOT_HOST` in [`.env.example`](.env.example).
 
 ### Local History Storage
 Metadata for all download sessions is persisted locally on the machine running the backend:
@@ -56,13 +47,13 @@ backend/data/download_history.json
 
 ## 🛠️ Prerequisites & Requirements
 
-Depending on how you choose to run the application:
+Depending on how you choose to run the application. Either way, the **frontend always runs natively** with Node — only the backend is containerized.
 
-### Option A: Docker Deployment (Recommended for Production)
+### Option A: Docker Backend (Recommended)
 - **Docker Desktop** (with WSL2 backend on Windows, or native Docker engine on macOS/Linux).
-- **mkcert** (for issuing trusted local HTTPS certificates).
+- **Node.js 18+** & `npm` (to run the frontend).
 
-### Option B: Native Local Development (No Docker)
+### Option B: Fully Native Local Development (No Docker)
 - **Python 3.10+**
 - **Node.js 18+** & `npm`
 - **FFmpeg** installed and accessible in your system `PATH`.
@@ -75,67 +66,12 @@ Choose one of the two setup paths below:
 
 ---
 
-### Method A: Production Docker Setup (Recommended)
+### Method A: Docker Backend + Native Frontend (Recommended)
 
-Follow these steps to run the complete production stack (Nginx + FastAPI Backend + PO Token Provider + React SPA) with local HTTPS.
+The backend (FastAPI + yt-dlp + the PO token provider) runs in Docker; the frontend runs natively with Vite.
 
-#### Step 1: Install `mkcert` and Local CA
-`mkcert` creates a locally-trusted certificate authority so your browser won't display SSL warnings on `https://ytdownloader.local`.
-
-* **Windows (via Scoop or Chocolatey)**:
-  ```powershell
-  scoop install mkcert
-  # OR
-  choco install mkcert
-  ```
-* **macOS**:
-  ```bash
-  brew install mkcert
-  ```
-* **Linux (Debian/Ubuntu)**:
-  ```bash
-  sudo apt install libnss3-tools
-  curl -Lo mkcert https://github.com/FiloSottile/mkcert/releases/latest/download/mkcert-v*-linux-amd64
-  chmod +x mkcert && sudo mv mkcert /usr/local/bin/
-  ```
-
-Run this command **once** to register the root CA in your system and browser trust stores:
-```bash
-mkcert -install
-```
-
-#### Step 2: Generate TLS Certificates
-Navigate to the `nginx/certs` directory and issue a certificate for `ytdownloader.local`:
-
-* **Windows (PowerShell)**:
-  ```powershell
-  cd nginx/certs
-  mkcert ytdownloader.local
-  cd ../..
-  ```
-* **macOS / Linux**:
-  ```bash
-  cd nginx/certs
-  mkcert ytdownloader.local
-  cd ../..
-  ```
-
-This creates `ytdownloader.local.pem` and `ytdownloader.local-key.pem` inside `nginx/certs/`.
-
-#### Step 3: Add Hostname to your Hosts File
-Map `ytdownloader.local` to `127.0.0.1` on your host OS.
-
-* **Windows**: Open Notepad **as Administrator** and edit `C:\Windows\System32\drivers\etc\hosts`:
-  ```text
-  127.0.0.1   ytdownloader.local
-  ```
-* **macOS / Linux**:
-  ```bash
-  echo "127.0.0.1   ytdownloader.local" | sudo tee -a /etc/hosts
-  ```
-
-#### Step 4: Configure `.env` File
-Copy the example environment file:
+#### Step 1: Configure `.env` File
+Copy the example environment file and set `DOWNLOADS_ROOT_HOST` to the host folder you want bind-mounted into the container. This is **required** — `docker compose up` will refuse to start without it:
 
 * **Windows (PowerShell)**:
   ```powershell
@@ -146,41 +82,34 @@ Copy the example environment file:
   cp .env.example .env
   ```
 
-Open `.env` and set `DOWNLOADS_ROOT_HOST` to your user Downloads directory path:
+```env
+# Windows — forward slashes for Docker compatibility
+DOWNLOADS_ROOT_HOST=C:/Users/YourUsername/Downloads
+# macOS / Linux
+DOWNLOADS_ROOT_HOST=/home/yourusername/Downloads
+```
 
-* **Windows (use forward slashes for Docker compatibility)**:
-  ```env
-  DOWNLOADS_ROOT_HOST=C:/Users/YourUsername/Downloads
-  ```
-* **macOS / Linux**:
-  ```env
-  DOWNLOADS_ROOT_HOST=/home/yourusername/Downloads
-  ```
-
-#### Step 5: Ensure `cookies.txt` Exists
-Create an empty `cookies.txt` file if you don't have one yet (you can update it with real YouTube session cookies later):
-
-* **Windows (PowerShell)**:
-  ```powershell
-  New-Item -Force backend/config/cookies.txt
-  ```
-* **macOS / Linux**:
-  ```bash
-  touch backend/config/cookies.txt
-  ```
-
-#### Step 6: Build & Launch Docker Stack
+#### Step 2: Launch the Backend
 ```bash
 docker compose up -d --build
 ```
+Backend will be available on `http://127.0.0.1:8000`.
 
-#### Step 7: Access the Application!
-Open your browser and visit:
-👉 **[https://ytdownloader.local](https://ytdownloader.local)**
+#### Step 3: Start the Frontend (Vite React SPA)
+In a separate terminal:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Frontend dev server will start on `http://localhost:5173`. The dev server proxies `/api` and `/health` to `http://127.0.0.1:8000` by default, so no frontend config is needed as long as the backend is on its default port. If your backend runs elsewhere (a different port, or Docker on another host), copy `frontend/.env.example` to `frontend/.env` and set `VITE_API_BASE_URL` to that backend's URL.
+
+#### Step 4: Configure the Download Location
+Open the app and, in the first-run dialog (or Settings → Download Location), enter the **same path you set for `DOWNLOADS_ROOT_HOST`** — the backend only writes through that bind mount.
 
 ---
 
-### Method B: Native Local Development (Without Docker)
+### Method B: Fully Native Local Development (Without Docker)
 
 Use this setup if you want to modify code or develop features locally without Docker.
 
@@ -219,7 +148,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Frontend dev server will start on `http://localhost:5173`.
+Frontend dev server will start on `http://localhost:5173`, proxying `/api` and `/health` to `http://127.0.0.1:8000` by default (see the note in Method A, Step 3, if your backend runs elsewhere).
 
 ---
 
@@ -234,9 +163,9 @@ Frontend dev server will start on `http://localhost:5173`.
 5. **View Recent Downloads & Local History**:
    - Scroll down to the **Recent Downloads** section to view your 5 most recent sessions.
    - Click the **History** icon in the header (beside theme toggle) or click **View History →** to open the full history dialog.
-   - Click **Details** on any history item to see the original URL, target format/quality, saved location (`Downloads/`), and individual item download statuses or errors.
+   - Click **Details** on any history item to see the original URL, target format/quality, saved location, and individual item download statuses or errors.
    - Click **Redownload** to re-download a session using its original configuration.
-6. **Access Your Files**: Open your system's `Downloads/YT-Video Downloader/` folder to view your newly downloaded media!
+6. **Access Your Files**: Open the folder you configured in Settings → Download Location to view your newly downloaded media!
 
 ---
 
@@ -263,35 +192,33 @@ YouTube aggressively limits unauthenticated automated downloads. To ensure smoot
 1. Install a browser extension like **Get cookies.txt LOCALLY** (for Chrome/Edge/Firefox).
 2. Open YouTube while logged into an account and export your cookies in **Netscape format**.
 3. Save the exported file to `backend/config/cookies.txt`.
-4. **Note for Docker**: `cookies.txt` is read-only bind-mounted into the container (`./backend/config/cookies.txt:/app/config/cookies.txt:ro`). You can update this file on your host machine at any time without rebuilding the container.
+4. **Note for Docker**: `./backend/config` is bind-mounted into the container (`./backend/config:/app/backend/config`), so you can drop/update `cookies.txt` there — or import it via Settings → Advanced in the UI — without rebuilding the container.
 
 ---
 
 ## 🏗️ Project Architecture & Docker Topology
 
 ```text
-Browser (HTTPS)
-      │
-      ▼
-┌─────────────┐  :80 (HTTP redirect) ┌──────────────────────────────────┐
-│    Nginx    │  :443 (TLS)          │       ytdl-net (Bridge)          │
-│  Container  │◄────────────────────►│                                  │
-│  (Public)   │   /api/* (HTTP)      │  ┌──────────────────────────┐    │
-└─────────────┘─────────────────────►│  │   backend (FastAPI)      │    │
-       │          /api/ws/* (WS)     │  │   uvicorn :8000          │    │
-       │                             │  └────────────┬─────────────┘    │
-       │                             │               │ POT_PROVIDER_BASE_URL
-       │                             │  ┌────────────▼─────────────┐    │
-       │                             │  │  bgutil-provider :4416   │    │
-       │                             │  └──────────────────────────┘    │
-       │                             └──────────────────────────────────┘
-       │  Static React Assets
-       └── / -> Served by Nginx static root
+Browser
+  │
+  ├── http://localhost:5173  ──────────►  React SPA (Vite dev server, native)
+  │                                            │ fetch /api/*, ws /api/ws/*
+  ▼                                            ▼
+http://localhost:8000  ─────────────►  ┌──────────────────────────┐
+                                        │   backend (FastAPI)      │
+                                        │   uvicorn :8000           │
+                                        │   (Docker or native)      │
+                                        └────────────┬──────────────┘
+                                                      │ BGUTIL_BASE_URL
+                                        ┌─────────────▼─────────────┐
+                                        │      bgutil :4416         │
+                                        │  (Docker only)             │
+                                        └────────────────────────────┘
 ```
 
-* **Nginx**: Acts as the sole public gateway on ports 80/443. Terminates TLS via `mkcert` certificates, serves built static React frontend assets, proxies `/api/*` REST endpoints, and proxies `/api/ws/*` WebSocket connections with HTTP Upgrade headers.
-* **Backend**: FastAPI app isolated inside `ytdl-net`. Runs `yt-dlp` and `FFmpeg` non-root inside the container, managing download jobs and saving history metadata to `data/download_history.json`.
-* **bgutil-provider**: `brainicism/bgutil-ytdlp-pot-provider` container offering YouTube PO Token generation for `yt-dlp`.
+* **Backend**: FastAPI app running `yt-dlp` and `FFmpeg`, managing download jobs over WebSocket and persisting history/settings to `backend/data/*.json`. Runs on port 8000 either via Docker (`compose.yaml`) or natively (`run_api.py`).
+* **bgutil**: the Compose service name for the `brainicism/bgutil-ytdlp-pot-provider` container, offering YouTube PO Token generation for `yt-dlp`. The backend finds it via `BGUTIL_BASE_URL=http://bgutil:4416` (Docker's internal DNS resolves `bgutil` to this container). Only present in the Docker setup (Method A) — use `docker compose logs bgutil` to inspect it; native-only setups run without it.
+* **Frontend**: React SPA served by the Vite dev server (or a static build) — never containerized, and talks to the backend directly over plain HTTP/WS.
 
 ---
 
@@ -299,9 +226,10 @@ Browser (HTTPS)
 
 | Issue / Symptom | Probable Cause | Solution |
 |---|---|---|
-| **SSL / Certificate Warning in Browser** | `mkcert` CA not installed in browser trust store. | Run `mkcert -install`, restart browser. For Firefox, manually import root CA from `mkcert -CAROOT`. |
-| **`ytdownloader.local` host not found** | Missing `/etc/hosts` or Windows hosts entry. | Add `127.0.0.1 ytdownloader.local` to system hosts file. |
-| **FFmpeg Error during audio download** | FFmpeg missing on PATH in non-Docker setup. | Install `ffmpeg` and ensure `ffmpeg -version` works in command prompt. |
-| **502 Bad Gateway from Nginx** | Backend container still starting or failing healthcheck. | Run `docker compose logs backend` to inspect Python startup errors. |
-| **Downloads landing in container instead of host** | `DOWNLOADS_ROOT_HOST` path incorrect in `.env`. | Verify absolute path in `.env` uses forward slashes (e.g. `C:/Users/name/Downloads`). |
-| **YouTube 429 / Bot Detection Error** | Expired or missing YouTube cookies. | Update `backend/config/cookies.txt` with fresh Netscape cookies exported from your browser. |
+| **"A download location has not been configured"** | No download folder saved in Settings yet (first-run gate) — applies in both native and Docker mode, since it checks whether a value is stored, not where files actually get written. | Set it via Settings → Download Location. |
+| **"This app runs in Docker and downloads through a host folder..." error when saving Settings** | (Docker only) The path you entered in Settings doesn't match `DOWNLOADS_ROOT_HOST` in `.env` — a different error than the one above. | Enter the exact same absolute path as `DOWNLOADS_ROOT_HOST`, or change `DOWNLOADS_ROOT_HOST` and re-run `docker compose up -d` to pick a different folder. |
+| **FFmpeg Error during audio download** | FFmpeg missing on PATH in a fully-native (non-Docker) setup. | Install `ffmpeg` and ensure `ffmpeg -version` works in command prompt. |
+| **Backend unreachable / "disconnected" status** | Backend container still starting, failing healthcheck, or not running. | Run `docker compose logs backend` (Docker) or check the `run_api.py` terminal for Python startup errors. |
+| **Downloads landing in the wrong folder** | `DOWNLOADS_ROOT_HOST` path incorrect in `.env` (e.g. left as a placeholder or using `${HOME}`, which is unset on native Windows). | Set `DOWNLOADS_ROOT_HOST` to a real absolute path (see `.env.example`) and confirm it with `docker compose config`. |
+| **YouTube 429 / Bot Detection Error** | Expired or missing YouTube cookies. | Import a fresh Netscape `cookies.txt` via Settings → Advanced, or update `backend/config/cookies.txt` directly. |
+| **Frontend requests blocked by CORS / "Failed to fetch"** | The backend only accepts requests from `http://localhost:5173` and `http://127.0.0.1:5173` by default. | If you run the frontend on a different port or host, set `CORS_ALLOWED_ORIGINS` (comma-separated) in `.env` to match. |

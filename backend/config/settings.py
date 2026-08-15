@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Allows overriding the downloads root via environment variable so Docker
@@ -26,3 +29,24 @@ DEFAULT_RESOLUTION_PRIORITY = ["720p", "480p"]
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_RETRY_ATTEMPTS = 3
 MAX_FILENAME_LENGTH = 200
+
+# CORS allowlist. Defaults to the Vite dev server's own origins so a browser
+# tab on any other site can't call this locally-running API. Override with a
+# comma-separated list (e.g. when the frontend runs on a non-default port or
+# host) via CORS_ALLOWED_ORIGINS.
+_CORS_DEFAULT_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+_CORS_ORIGINS_ENV = os.environ.get("CORS_ALLOWED_ORIGINS")
+if _CORS_ORIGINS_ENV:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _CORS_ORIGINS_ENV.split(",") if origin.strip()]
+    if not CORS_ALLOWED_ORIGINS:
+        # A set-but-empty-after-parsing value (e.g. just commas/whitespace) would
+        # otherwise silently produce allow_origins=[] and lock out every browser,
+        # including the real frontend. Fall back instead of failing closed.
+        logger.warning(
+            "CORS_ALLOWED_ORIGINS was set to %r but contained no usable origins; "
+            "falling back to the default localhost origins.",
+            _CORS_ORIGINS_ENV,
+        )
+        CORS_ALLOWED_ORIGINS = _CORS_DEFAULT_ORIGINS
+else:
+    CORS_ALLOWED_ORIGINS = _CORS_DEFAULT_ORIGINS
