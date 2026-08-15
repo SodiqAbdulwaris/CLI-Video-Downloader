@@ -102,7 +102,9 @@ async def upload_cookies(file: UploadFile = File(...)):
     config_dir.mkdir(parents=True, exist_ok=True)
 
     cookies_path = config_dir / "cookies.txt"
-    cookies_path.write_bytes(content)
+    tmp_path = cookies_path.with_suffix(".txt.tmp")
+    tmp_path.write_bytes(content)
+    tmp_path.replace(cookies_path)
 
     return {
         "success": True,
