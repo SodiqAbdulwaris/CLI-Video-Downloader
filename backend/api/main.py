@@ -90,11 +90,13 @@ async def upload_cookies(file: UploadFile = File(...)):
     if not file.filename or not file.filename.lower().endswith(".txt"):
         raise HTTPException(status_code=400, detail="Expected a .txt cookies file (Netscape format).")
 
-    content = await file.read()
-    if not content:
-        raise HTTPException(status_code=400, detail="Uploaded cookies file is empty.")
+    # Read one byte past the cap instead of the whole body, so an oversized
+    # upload can't buffer arbitrarily large content in memory before rejection.
+    content = await file.read(MAX_COOKIES_FILE_SIZE + 1)
     if len(content) > MAX_COOKIES_FILE_SIZE:
         raise HTTPException(status_code=413, detail="Cookies file is too large (max 1 MiB).")
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded cookies file is empty.")
 
     config_dir = Path(__file__).resolve().parent.parent / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
