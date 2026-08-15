@@ -59,6 +59,14 @@ export function useDownloadSocket(initialJobId: string | null = null) {
       jobStatusRef.current = event.status;
       if (event.status === 'failed') {
         setJobError(event.error || 'The download job failed.');
+        // Items still mid-flight never receive their own "failed" item event
+        // when the job aborts (e.g. a crash between items) — stop their
+        // spinner/progress bar by marking them failed too.
+        setJobItems(prev => prev.map(item =>
+          item.state === 'downloading' || item.state === 'queued'
+            ? { ...item, state: 'failed', error: item.error || event.error || 'Job failed' }
+            : item
+        ));
       }
       setSocketLogs(prev => [...prev, `[Job] Status updated to: ${event.status}`]);
     } else if (event.type === 'item') {
