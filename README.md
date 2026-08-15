@@ -226,9 +226,10 @@ http://localhost:8000  ─────────────►  ┌───�
 
 | Issue / Symptom | Probable Cause | Solution |
 |---|---|---|
-| **"A download location has not been configured"** | No download folder chosen yet, or (Docker) the chosen path doesn't match the bind mount. | Set it via Settings → Download Location. In Docker it must exactly match `DOWNLOADS_ROOT_HOST` in `.env`. |
+| **"A download location has not been configured"** | No download folder saved in Settings yet (first-run gate) — applies in both native and Docker mode, since it checks whether a value is stored, not where files actually get written. | Set it via Settings → Download Location. |
+| **"This app runs in Docker and downloads through a host folder..." error when saving Settings** | (Docker only) The path you entered in Settings doesn't match `DOWNLOADS_ROOT_HOST` in `.env` — a different error than the one above. | Enter the exact same absolute path as `DOWNLOADS_ROOT_HOST`, or change `DOWNLOADS_ROOT_HOST` and re-run `docker compose up -d` to pick a different folder. |
 | **FFmpeg Error during audio download** | FFmpeg missing on PATH in a fully-native (non-Docker) setup. | Install `ffmpeg` and ensure `ffmpeg -version` works in command prompt. |
 | **Backend unreachable / "disconnected" status** | Backend container still starting, failing healthcheck, or not running. | Run `docker compose logs backend` (Docker) or check the `run_api.py` terminal for Python startup errors. |
-| **Downloads landing in container instead of host** | `DOWNLOADS_ROOT_HOST` path incorrect in `.env`, or app's configured location doesn't match it. | Verify the `.env` path uses forward slashes (e.g. `C:/Users/name/Downloads`) and matches what's set in Settings. |
+| **Downloads landing in the wrong folder** | `DOWNLOADS_ROOT_HOST` path incorrect in `.env` (e.g. left as a placeholder or using `${HOME}`, which is unset on native Windows). | Set `DOWNLOADS_ROOT_HOST` to a real absolute path (see `.env.example`) and confirm it with `docker compose config`. |
 | **YouTube 429 / Bot Detection Error** | Expired or missing YouTube cookies. | Import a fresh Netscape `cookies.txt` via Settings → Advanced, or update `backend/config/cookies.txt` directly. |
 | **Frontend requests blocked by CORS / "Failed to fetch"** | The backend only accepts requests from `http://localhost:5173` and `http://127.0.0.1:5173` by default. | If you run the frontend on a different port or host, set `CORS_ALLOWED_ORIGINS` (comma-separated) in `.env` to match. |
