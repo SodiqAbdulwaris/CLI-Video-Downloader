@@ -1,10 +1,9 @@
-import { Menu, Sun, Moon } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { Button } from './ui/button';
 import type { NavTab } from './Sidebar';
 
 interface HeaderProps {
   activeTab: NavTab;
-  onMobileMenuOpen: () => void;
   isDarkMode: boolean;
   onToggleTheme: () => void;
   serverStatus: 'connected' | 'disconnected' | 'checking';
@@ -12,7 +11,6 @@ interface HeaderProps {
 
 export function Header({
   activeTab,
-  onMobileMenuOpen,
   isDarkMode,
   onToggleTheme,
   serverStatus,
@@ -26,7 +24,7 @@ export function Header({
       case 'history':
         return { title: 'Download History', sub: 'Review previous download sessions and redownload files' };
       case 'settings':
-        return { title: 'Application Settings', sub: 'Configure download location, themes, and server' };
+        return { title: 'Settings', sub: 'Configure download location, themes, and server' };
       default:
         return { title: 'YT Downloader', sub: 'Local Desktop Download Manager' };
     }
@@ -37,17 +35,6 @@ export function Header({
   return (
     <header className="flex items-center justify-between py-4 px-4 sm:px-8 border-b border-border/60 bg-card/50 backdrop-blur-xs sticky top-0 z-10 select-none">
       <div className="flex items-center gap-3">
-        {/* Mobile Hamburger Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onMobileMenuOpen}
-          className="md:hidden size-9 rounded-xl hover:bg-muted"
-          aria-label="Open menu"
-        >
-          <Menu className="size-5" />
-        </Button>
-
         <div className="flex flex-col">
           <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground leading-tight">
             {title}

@@ -1,12 +1,11 @@
-import { 
-  Download, 
-  ListVideo, 
-  History, 
-  Settings, 
-  Sun, 
-  Moon, 
-  Server, 
-  X
+import {
+  Download,
+  ListVideo,
+  History,
+  Settings,
+  Sun,
+  Moon,
+  Server,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -20,10 +19,12 @@ interface SidebarProps {
   onToggleTheme: () => void;
   serverStatus: 'connected' | 'disconnected' | 'checking';
   activeJobsCount?: number;
-  mobileOpen: boolean;
-  onMobileToggle: (open: boolean) => void;
 }
 
+// Desktop-persistent sidebar. Below the md breakpoint it hides entirely —
+// BottomNav.tsx is the mobile nav counterpart (matches the design's
+// sidebar/bottom-nav split, reconciled onto the existing md:768px breakpoint
+// rather than the design's 900px).
 export function Sidebar({
   activeTab,
   onTabChange,
@@ -31,8 +32,6 @@ export function Sidebar({
   onToggleTheme,
   serverStatus,
   activeJobsCount = 0,
-  mobileOpen,
-  onMobileToggle
 }: SidebarProps) {
   const navItems = [
     {
@@ -76,15 +75,6 @@ export function Sidebar({
               </span>
             </div>
           </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onMobileToggle(false)}
-            className="md:hidden size-8 rounded-lg"
-          >
-            <X className="size-4" />
-          </Button>
         </div>
 
         {/* Primary Navigation */}
@@ -95,10 +85,7 @@ export function Sidebar({
             return (
               <button
                 key={item.id}
-                onClick={() => {
-                  onTabChange(item.id);
-                  onMobileToggle(false);
-                }}
+                onClick={() => onTabChange(item.id)}
                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                   isActive
                     ? 'bg-primary/10 text-primary font-semibold border border-primary/20 shadow-2xs'
@@ -124,10 +111,7 @@ export function Sidebar({
         {/* Settings Tab */}
         <nav className="flex flex-col gap-1">
           <button
-            onClick={() => {
-              onTabChange('settings');
-              onMobileToggle(false);
-            }}
+            onClick={() => onTabChange('settings')}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
               activeTab === 'settings'
                 ? 'bg-primary/10 text-primary font-semibold border border-primary/20 shadow-2xs'
@@ -198,28 +182,8 @@ export function Sidebar({
   );
 
   return (
-    <>
-      {/* Desktop Sidebar (Persistent) */}
-      <aside className="hidden md:block shrink-0 h-screen sticky top-0">
-        {content}
-      </aside>
-
-      {/* Mobile Drawer Backdrop */}
-      {mobileOpen && (
-        <div 
-          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-40 transition-opacity"
-          onClick={() => onMobileToggle(false)}
-        />
-      )}
-
-      {/* Mobile Drawer */}
-      <div 
-        className={`md:hidden fixed inset-y-0 left-0 z-50 transition-transform duration-300 transform ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        {content}
-      </div>
-    </>
+    <aside className="hidden md:block shrink-0 h-screen sticky top-0">
+      {content}
+    </aside>
   );
 }

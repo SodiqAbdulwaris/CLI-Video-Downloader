@@ -67,12 +67,7 @@ class VideoDownloader:
 
         if bgutil_url:
             self._base_options["extractor_args"] = {
-                "youtube": {
-                    "pot": {
-                        "provider": "bgutil:http",
-                        "base_url": bgutil_url,
-                    }
-                }
+                "youtubepot-bgutilhttp": {"base_url": [bgutil_url]}
             }
         
         logger.debug("Cookies file: %s", COOKIES_FILE_PATH.resolve())
