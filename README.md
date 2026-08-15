@@ -4,8 +4,6 @@ A lightweight YouTube downloader with both a command-line interface and a local 
 
 Paste a YouTube URL, choose your download options, and the video, Short, playlist, or audio track lands on your local disk.
 
-<!-- Add a screenshot or short GIF of the web UI here (e.g. docs/images/dashboard.png) -->
-
 ## Features
 
 - Download individual YouTube videos
