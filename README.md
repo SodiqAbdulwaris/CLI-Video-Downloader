@@ -323,11 +323,13 @@ npm run build
 npm run lint
 ```
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to open a pull request.
+
 Development notes and the history of past changes live in `docs/agent-log/`. That folder documents why decisions were made; this README documents the project as it exists now.
 
 ## License
 
-No license file is currently included in this repository. Until one is added, all rights are reserved by default; treat the code accordingly if you plan to reuse it.
+MIT. See [LICENSE](LICENSE).
 
 ## Disclaimer
 
