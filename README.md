@@ -226,7 +226,7 @@ http://localhost:8000  ─────────────►  ┌───�
 
 | Issue / Symptom | Probable Cause | Solution |
 |---|---|---|
-| **"A download location has not been configured"** | No download folder chosen yet in Settings. Native/non-Docker mode only — in Docker the backend always writes through the `/downloads` mount, so this specific message can't occur there. | Set it via Settings → Download Location. |
+| **"A download location has not been configured"** | No download folder saved in Settings yet (first-run gate) — applies in both native and Docker mode, since it checks whether a value is stored, not where files actually get written. | Set it via Settings → Download Location. |
 | **"This app runs in Docker and downloads through a host folder..." error when saving Settings** | (Docker only) The path you entered in Settings doesn't match `DOWNLOADS_ROOT_HOST` in `.env` — a different error than the one above. | Enter the exact same absolute path as `DOWNLOADS_ROOT_HOST`, or change `DOWNLOADS_ROOT_HOST` and re-run `docker compose up -d` to pick a different folder. |
 | **FFmpeg Error during audio download** | FFmpeg missing on PATH in a fully-native (non-Docker) setup. | Install `ffmpeg` and ensure `ffmpeg -version` works in command prompt. |
 | **Backend unreachable / "disconnected" status** | Backend container still starting, failing healthcheck, or not running. | Run `docker compose logs backend` (Docker) or check the `run_api.py` terminal for Python startup errors. |
