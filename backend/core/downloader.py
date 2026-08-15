@@ -326,6 +326,7 @@ class VideoDownloader:
                 )
                 final_path = ensure_unique_path(target_dir / final_name)
                 convert_to_mp3(input_path, final_path)
+                self._save_description(info, final_path)
                 self._log_success(final_path=final_path, selection=selection, context=context)
                 return final_path
 
@@ -353,6 +354,7 @@ class VideoDownloader:
                     progress_hook=progress_hook,
                 )
                 merge_streams(video_path, audio_path, final_path)
+                self._save_description(info, final_path)
                 self._log_success(final_path=final_path, selection=selection, context=context)
                 return final_path
 
@@ -368,8 +370,19 @@ class VideoDownloader:
             # folder are different devices, so a plain rename raises EXDEV.
             # shutil.move() falls back to copy+delete when that happens.
             shutil.move(str(downloaded), str(final_path))
+            self._save_description(info, final_path)
             self._log_success(final_path=final_path, selection=selection, context=context)
             return final_path
+
+    def _save_description(self, info: dict[str, Any], final_path: Path) -> None:
+        description = info.get("description")
+        if not description:
+            return
+        description_path = final_path.with_name(final_path.stem + ".description.txt")
+        try:
+            description_path.write_text(description, encoding="utf-8")
+        except OSError as exc:
+            logger.warning("Could not save description for %s: %s", final_path.name, exc)
 
     def _log_success(
         self,
