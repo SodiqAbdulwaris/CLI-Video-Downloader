@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
@@ -13,6 +14,8 @@ from core.formats import FormatOption, FormatSelection, list_resolutions, normal
 from core.playlist import PlaylistEntry, get_playlist_entries, is_playlist
 from utils.file_utils import ensure_directory, ensure_unique_path, resolve_output_path, sanitize_name, temporary_prefix
 from utils.logging_utils import log_download, log_error
+
+logger = logging.getLogger(__name__)
 
 
 class VideoDownloaderError(RuntimeError):
@@ -72,13 +75,14 @@ class VideoDownloader:
                 }
             }
         
-        print(f"Cookies file: {COOKIES_FILE_PATH.resolve()}")
+        logger.debug("Cookies file: %s", COOKIES_FILE_PATH.resolve())
         if COOKIES_FILE_PATH.exists():
             self._base_options["cookiefile"] = str(COOKIES_FILE_PATH)
         else:
-            print(
-                "Warning: cookie auth is not active because "
-                f"{COOKIES_FILE_PATH} does not exist. YouTube bot-detection errors are more likely."
+            logger.warning(
+                "Cookie auth is not active because %s does not exist. "
+                "YouTube bot-detection errors are more likely.",
+                COOKIES_FILE_PATH,
             )
 
     def fetch_info(self, url: str) -> dict[str, Any]:
@@ -238,7 +242,7 @@ class VideoDownloader:
 
         for offset, index in enumerate(indices, start=1):
             entry = entries[index]
-            print(f"Downloading video {offset} of {len(indices)}: {entry.title}")
+            logger.info("Downloading video %d of %d: %s", offset, len(indices), entry.title)
             try:
                 if item_status_callback:
                     item_status_callback(entry, "downloading", None)

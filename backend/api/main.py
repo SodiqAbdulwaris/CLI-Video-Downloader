@@ -12,15 +12,18 @@ from api.history import router as history_router
 from api.jobs import JobManager
 from api.settings import router as settings_router
 from api.thumbnail import extract_thumbnail
+from config.settings import CORS_ALLOWED_ORIGINS
 from core.downloader import VideoDownloader, VideoDownloaderError
 from core.playlist import get_playlist_entries
 from services.settings_service import settings_service
 from utils.validators import is_valid_url
 
+MAX_COOKIES_FILE_SIZE = 1 * 1024 * 1024  # cookies.txt files are a few KB at most
+
 app = FastAPI(title="YT-Video Downloader API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,12 +87,19 @@ async def download(request: DownloadRequest) -> dict[str, str]:
 
 @app.post("/api/cookies")
 async def upload_cookies(file: UploadFile = File(...)):
+    if not file.filename or not file.filename.lower().endswith(".txt"):
+        raise HTTPException(status_code=400, detail="Expected a .txt cookies file (Netscape format).")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded cookies file is empty.")
+    if len(content) > MAX_COOKIES_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="Cookies file is too large (max 1 MiB).")
+
     config_dir = Path(__file__).resolve().parent.parent / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
 
     cookies_path = config_dir / "cookies.txt"
-
-    content = await file.read()
     cookies_path.write_bytes(content)
 
     return {
@@ -129,11 +139,11 @@ def _resolve(url: str) -> dict:
         resolved_entries = []
         for entry in entries:
             raw_match = None
-            for re in raw_entries:
-                if not re:
+            for raw_entry in raw_entries:
+                if not raw_entry:
                     continue
-                if re.get("title") == entry.title or re.get("webpage_url") == entry.url or re.get("url") == entry.url:
-                    raw_match = re
+                if raw_entry.get("title") == entry.title or raw_entry.get("webpage_url") == entry.url or raw_entry.get("url") == entry.url:
+                    raw_match = raw_entry
                     break
             thumb_url = extract_thumbnail(raw_match) if raw_match else None
             resolved_entries.append({

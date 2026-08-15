@@ -13,6 +13,9 @@ services:
       # backend to enforce that the download location chosen in Settings
       # matches the folder actually mounted here. Required — see .env.example.
       DOWNLOADS_ROOT_HOST: ${DOWNLOADS_ROOT_HOST:?Set DOWNLOADS_ROOT_HOST in your .env file — see .env.example}
+      # Optional. Comma-separated frontend origins allowed to call this API.
+      # Defaults to the Vite dev server's own origins when unset.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
 
     ports:
       - "8000:8000"

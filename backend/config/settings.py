@@ -26,3 +26,14 @@ DEFAULT_RESOLUTION_PRIORITY = ["720p", "480p"]
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_RETRY_ATTEMPTS = 3
 MAX_FILENAME_LENGTH = 200
+
+# CORS allowlist. Defaults to the Vite dev server's own origins so a browser
+# tab on any other site can't call this locally-running API. Override with a
+# comma-separated list (e.g. when the frontend runs on a non-default port or
+# host) via CORS_ALLOWED_ORIGINS.
+_CORS_ORIGINS_ENV = os.environ.get("CORS_ALLOWED_ORIGINS")
+CORS_ALLOWED_ORIGINS = (
+    [origin.strip() for origin in _CORS_ORIGINS_ENV.split(",") if origin.strip()]
+    if _CORS_ORIGINS_ENV
+    else ["http://localhost:5173", "http://127.0.0.1:5173"]
+)
