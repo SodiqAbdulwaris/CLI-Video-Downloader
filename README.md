@@ -13,6 +13,7 @@ Paste a YouTube URL, choose your download options, and the video, Short, playlis
 - Download full playlists
 - Download selected videos from a playlist
 - Extract audio as MP3
+- Save the video's description alongside the downloaded file
 - Live download progress over WebSocket
 - Persistent local download history
 - Re-download a past session with its original settings
@@ -132,6 +133,8 @@ The frontend has its own `.env` (copy `frontend/.env.example` to `frontend/.env`
 | Audio only | Yes | MP3 |
 
 Available resolutions depend on what the source video actually offers. All downloads are saved directly into a single configured folder; there are no per-type or per-playlist subfolders.
+
+If a video has a description, it's saved next to the downloaded file as a plain text file with the same name plus `.description.txt`, for example `My Video.mp4` and `My Video.description.txt`. Videos with no description don't get a text file at all.
 
 ## Download History
 
