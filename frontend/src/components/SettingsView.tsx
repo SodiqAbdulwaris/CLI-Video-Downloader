@@ -268,7 +268,7 @@ export function SettingsView({
           </Badge>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs flex items-start gap-2.5 leading-relaxed">
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5 leading-relaxed">
           <ShieldAlert className="size-4 shrink-0 mt-0.5" />
           <div>
             <span className="font-bold">Security Notice: </span>
