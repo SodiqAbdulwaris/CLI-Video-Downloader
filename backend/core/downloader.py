@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -362,7 +363,11 @@ class VideoDownloader:
                 title=title,
                 progress_hook=progress_hook,
             )
-            downloaded.replace(final_path)
+            # Path.replace() (os.replace()) cannot cross filesystem boundaries.
+            # In Docker, the temp download dir and the bind-mounted downloads
+            # folder are different devices, so a plain rename raises EXDEV.
+            # shutil.move() falls back to copy+delete when that happens.
+            shutil.move(str(downloaded), str(final_path))
             self._log_success(final_path=final_path, selection=selection, context=context)
             return final_path
 
