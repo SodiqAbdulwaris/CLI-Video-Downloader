@@ -120,6 +120,47 @@ def test_playlist_partial_failure_status_matches_history(client, monkeypatch, tm
     assert history[0]["failed"] == 1
 
 
+def test_playlist_partial_selection_downloads_only_the_chosen_videos(client, monkeypatch, tmp_path):
+    """A user picking 2 of 5 playlist videos must get exactly those 2 files
+    on disk — not the whole playlist, not the wrong 2 — with history
+    reflecting the selection accurately."""
+    entries = [
+        {"title": "Video One", "playlist_index": 1, "webpage_url": "https://x/1"},
+        {"title": "Video Two", "playlist_index": 2, "webpage_url": "https://x/2"},
+        {"title": "Video Three", "playlist_index": 3, "webpage_url": "https://x/3"},
+        {"title": "Video Four", "playlist_index": 4, "webpage_url": "https://x/4"},
+        {"title": "Video Five", "playlist_index": 5, "webpage_url": "https://x/5"},
+    ]
+    responses = {PL_URL: playlist_info("Five Videos", entries)}
+    for i, title in enumerate(["One", "Two", "Three", "Four", "Five"], start=1):
+        responses[f"https://x/{i}"] = video_info(f"Video {title}", str(i))
+    _use_stub(monkeypatch, responses)
+
+    resp = client.post(
+        "/api/download",
+        json={"url": PL_URL, "format_type": "video", "resolution": "360p", "indices": [2, 4]},
+    )
+    job_id = resp.json()["job_id"]
+
+    final_event = _wait_for_terminal_status(job_id)
+    assert final_event["status"] == "completed"  # an all-success job event carries no completed/failed counts
+
+    downloaded = sorted(p.name for p in (tmp_path / "downloads").glob("*.mp4"))
+    assert len(downloaded) == 2
+    assert any("Video Two" in name for name in downloaded)
+    assert any("Video Four" in name for name in downloaded)
+    assert not any("Video One" in name or "Video Three" in name or "Video Five" in name for name in downloaded)
+
+    history = client.get("/api/history").json()
+    session = history[0]
+    assert session["requestedIndices"] == [2, 4]
+    assert session["total"] == 2
+    assert session["successful"] == 2
+    assert session["failed"] == 0
+    downloaded_titles = {f["title"] for f in session["files"]}
+    assert downloaded_titles == {"Video Two", "Video Four"}
+
+
 def test_playlist_zero_based_index_is_rejected_end_to_end(client, monkeypatch):
     """Regression for the frontend off-by-one bug: a 0-based index reaching
     the API must fail clearly, not silently download the wrong item."""

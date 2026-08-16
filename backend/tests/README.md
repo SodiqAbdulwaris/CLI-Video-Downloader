@@ -8,7 +8,7 @@ Three kinds of test live here, in increasing order of what they actually exercis
 | Integration | The real FastAPI app, JobManager, HistoryService, SettingsService together, driven over HTTP/WebSocket | No — the yt-dlp boundary is stubbed | `uv run pytest backend/tests` (default) |
 | System | The real app end to end, including real `yt-dlp` and real YouTube | Yes | Run the `manual_*.py` script directly |
 
-`pytest`'s default discovery (`test_*.py`) picks up everything except the `manual_` prefixed scripts, so `uv run pytest backend/tests` runs all unit + integration tests (29 as of writing) without touching the network, and stays fast and deterministic.
+`pytest`'s default discovery (`test_*.py`) picks up everything except the `manual_` prefixed scripts, so `uv run pytest backend/tests` runs all unit + integration tests (30 as of writing) without touching the network, and stays fast and deterministic.
 
 ## Unit tests
 
@@ -27,7 +27,7 @@ Uses `fastapi.testclient.TestClient` against the real app. Only `core.downloader
 
 `HistoryService`/`SettingsService` are pointed at a `tmp_path` per test via monkeypatch, so tests never touch `backend/data/*.json`.
 
-Covers: health check, a full single-video download (file lands on disk, history recorded, `.description.txt` written), download rejected without a configured directory, settings roundtrip, history delete/clear — plus the regression cases below.
+Covers: health check, a full single-video download (file lands on disk, history recorded, `.description.txt` written), selecting a subset of a playlist (e.g. picking 2 of 5 videos downloads exactly those 2, not the whole playlist — also verified live against a real 25-video YouTube playlist), download rejected without a configured directory, settings roundtrip, history delete/clear — plus the regression cases below.
 
 ### A known test-infrastructure quirk
 
