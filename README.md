@@ -13,6 +13,8 @@ Paste a YouTube URL, choose your download options, and the video, Short, playlis
 - Extract audio as MP3
 - Save the video's description alongside the downloaded file
 - Live download progress over WebSocket
+- Pause, resume, and cancel a download in progress, per video
+- Multiple downloads at once — several videos from the same playlist, or several separate jobs — up to a configurable limit (default 2, up to 15)
 - Persistent local download history
 - Re-download a past session with its original settings
 - Command-line interface
@@ -102,6 +104,8 @@ npm run dev
 Open `http://localhost:5173`. The dev server proxies API and WebSocket requests to `http://127.0.0.1:8000` automatically, so no configuration is needed if you're running the backend on its default port.
 
 On first run, the app asks you to choose a download folder. Paste a URL, review the resolved title and available resolutions, pick a format, and start the download. Progress updates live over WebSocket.
+
+You don't have to wait for one download to finish before starting another — each video (including each video within a playlist) downloads independently, up to the concurrent-downloads limit in Settings (default 2). While a video is downloading you can pause it (it restarts from the beginning on resume — there's no partial-file resume) or cancel it outright, either individually or for an entire job at once.
 
 ## Configuration
 
