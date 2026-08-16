@@ -16,7 +16,7 @@ from services.settings_service import settings_service
 
 logger = logging.getLogger(__name__)
 
-JobStatus = Literal["queued", "running", "completed", "failed"]
+JobStatus = Literal["queued", "running", "completed", "partial", "failed"]
 ItemState = Literal["queued", "downloading", "done", "failed"]
 
 
@@ -39,6 +39,7 @@ class DownloadJob:
     loop: asyncio.AbstractEventLoop
     status: JobStatus = "queued"
     items: list[JobItem] = field(default_factory=list)
+    last_job_event: dict[str, Any] | None = None
 
 
 class JobManager:
@@ -74,6 +75,11 @@ class JobManager:
         return self._jobs.get(job_id)
 
     def _emit(self, job: DownloadJob, event: dict[str, Any]) -> None:
+        if event.get("type") == "job":
+            # Remembered so a client that (re)connects after the job already
+            # reached a terminal state gets the full event (including any
+            # error/failure detail), not just a bare status string.
+            job.last_job_event = event
         job.loop.call_soon_threadsafe(job.events.put_nowait, event)
 
     def _set_item_state(
@@ -170,7 +176,7 @@ class JobManager:
                 ]
 
                 if result.failed:
-                    job.status = "failed"
+                    job.status = "partial" if result.completed else "failed"
                     self._save_history(
                         job=job,
                         start_time=start_time,
@@ -185,7 +191,7 @@ class JobManager:
                         job,
                         {
                             "type": "job",
-                            "status": "failed",
+                            "status": job.status,
                             "job_id": job.id,
                             "completed": result.completed,
                             "failed": result.failed,

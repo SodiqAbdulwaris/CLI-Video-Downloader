@@ -40,13 +40,24 @@ class HistoryService:
                 if isinstance(data, dict) and "sessions" in data and isinstance(data["sessions"], list):
                     return data
                 logger.warning("History file structure invalid, returning empty history structure.")
+                self._backup_corrupt_file()
                 return {"version": CURRENT_VERSION, "sessions": []}
         except json.JSONDecodeError as exc:
             logger.error("Failed to parse download_history.json: %s", exc)
+            self._backup_corrupt_file()
             return {"version": CURRENT_VERSION, "sessions": []}
         except Exception as exc:
             logger.error("Failed to read history file: %s", exc)
             return {"version": CURRENT_VERSION, "sessions": []}
+
+    def _backup_corrupt_file(self) -> None:
+        """Preserve an unreadable history file instead of letting the next write erase it."""
+        backup_path = self.file_path.with_suffix(".json.corrupt")
+        try:
+            self.file_path.replace(backup_path)
+            logger.warning("Backed up unreadable history file to %s", backup_path)
+        except OSError as exc:
+            logger.error("Could not back up corrupt history file: %s", exc)
 
     def _write_raw_history(self, data: dict[str, Any]) -> None:
         _ensure_data_dir()

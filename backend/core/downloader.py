@@ -23,6 +23,23 @@ class VideoDownloaderError(RuntimeError):
     pass
 
 
+_BOT_DETECTION_MARKERS = ("403", "forbidden", "429", "too many requests", "sign in to confirm", "not a bot")
+
+
+def _explain_download_error(raw_message: str) -> str:
+    """Expand a raw yt-dlp error into something that tells the user what
+    likely happened and what to do, instead of a bare HTTP status code."""
+    if any(marker in raw_message.lower() for marker in _BOT_DETECTION_MARKERS):
+        return (
+            "YouTube blocked this request — likely bot-detection or an expired "
+            "cookies.txt, not an app bug. Export a fresh cookies.txt from a browser "
+            "logged into YouTube and replace backend/config/cookies.txt, then try "
+            "again. See the README's Troubleshooting section, \"YouTube returns a "
+            f"403, 429, or bot-detection error\", for the full explanation. ({raw_message})"
+        )
+    return raw_message
+
+
 @dataclass(slots=True)
 class DownloadContext:
     url: str
@@ -61,16 +78,18 @@ class VideoDownloader:
             "no_warnings": True,
             "socket_timeout": DEFAULT_TIMEOUT_SECONDS,
             "http_headers": {},
-            "js_runtimes": {"node": {}},
         }
-        
-        bgutil_url = os.getenv("BGUTIL_BASE_URL")
 
+        # Optional. Only set by the Docker Compose stack (see compose.yaml's
+        # bgutil service) so yt-dlp can fetch a PO Token when running there.
+        # Left unset for local/non-Docker runs, where yt-dlp's own default
+        # client selection plus a valid cookies.txt is sufficient.
+        bgutil_url = os.getenv("BGUTIL_BASE_URL")
         if bgutil_url:
             self._base_options["extractor_args"] = {
                 "youtubepot-bgutilhttp": {"base_url": [bgutil_url]}
             }
-        
+
         logger.debug("Cookies file: %s", COOKIES_FILE_PATH.resolve())
         if COOKIES_FILE_PATH.exists():
             self._base_options["cookiefile"] = str(COOKIES_FILE_PATH)
@@ -88,7 +107,7 @@ class VideoDownloader:
             with yt_dlp.YoutubeDL(options) as ydl:
                 return ydl.extract_info(url, download=False)
         except yt_dlp.utils.DownloadError as exc:
-            raise VideoDownloaderError(f"Could not fetch media information: {exc}") from exc
+            raise VideoDownloaderError(_explain_download_error(f"Could not fetch media information: {exc}")) from exc
 
     def fetch_playlist_listing(self, url: str) -> dict[str, Any]:
         """Return playlist metadata and flat entry references without resolving every video."""
@@ -98,7 +117,7 @@ class VideoDownloader:
             with yt_dlp.YoutubeDL(options) as ydl:
                 return ydl.extract_info(url, download=False)
         except yt_dlp.utils.DownloadError as exc:
-            raise VideoDownloaderError(f"Could not fetch playlist information: {exc}") from exc
+            raise VideoDownloaderError(_explain_download_error(f"Could not fetch playlist information: {exc}")) from exc
 
     def detect_type(self, info: dict[str, Any]) -> Literal["single", "playlist", "short"]:
         if is_playlist(info):
@@ -215,7 +234,9 @@ class VideoDownloader:
                         filename=filename,
                         error_message=str(exc),
                     )
-                    raise VideoDownloaderError(str(exc)) from exc
+                    already_logged = VideoDownloaderError(_explain_download_error(str(exc)))
+                    already_logged.logged = True
+                    raise already_logged from exc
         raise VideoDownloaderError("Download failed unexpectedly.")
 
     def download_playlist(
@@ -286,6 +307,8 @@ class VideoDownloader:
                         error=str(exc),
                     )
                 )
+                if getattr(exc, "logged", False):
+                    continue
                 log_error(
                     url=entry.url,
                     media_type="Playlist",

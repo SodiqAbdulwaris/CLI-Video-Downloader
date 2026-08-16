@@ -23,14 +23,15 @@ export function JobProgress({
         <span className="flex items-center gap-2 text-foreground/80">
           {jobStatus === 'completed' ? (
             <Check className="size-4 text-green-500" />
-          ) : jobStatus === 'failed' ? (
+          ) : jobStatus === 'partial' || jobStatus === 'failed' ? (
             <AlertCircle className="size-4 text-destructive" />
           ) : (
             <Loader2 className="size-4 text-primary animate-spin" />
           )}
           {jobStatus === 'completed' ? 'Processing Complete' :
-            jobStatus === 'failed' ? 'Job Failed' :
-              jobStatus === 'running' ? 'Downloading items...' : 'In Queue...'}
+            jobStatus === 'partial' ? 'Completed with Errors' :
+              jobStatus === 'failed' ? 'Job Failed' :
+                jobStatus === 'running' ? 'Downloading items...' : 'In Queue...'}
         </span>
         <span className="font-mono text-primary text-base">{overallProgress}%</span>
       </div>

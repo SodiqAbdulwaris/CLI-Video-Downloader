@@ -140,7 +140,7 @@ export default function App() {
 
   // Auto completion dialog & history refresh when job finishes
   useEffect(() => {
-    if (jobId && (jobStatus === 'completed' || jobStatus === 'failed')) {
+    if (jobId && (jobStatus === 'completed' || jobStatus === 'partial' || jobStatus === 'failed')) {
       if (completedJobIdRef.current !== jobId) {
         completedJobIdRef.current = jobId;
         refetchHistory();

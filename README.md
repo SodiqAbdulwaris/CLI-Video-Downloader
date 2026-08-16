@@ -302,9 +302,21 @@ The backend isn't running or hasn't finished starting. Check `docker compose log
 
 `DOWNLOADS_ROOT_HOST` is misconfigured, for example left as a placeholder, or using a variable like `${HOME}` that isn't set on native Windows. Set it to a real absolute path and confirm with `docker compose config`.
 
-### YouTube returns a 429 or bot-detection error
+### YouTube returns a 403, 429, or bot-detection error
 
-Your cookies are missing or expired. Export a fresh Netscape-format `cookies.txt` and import it from Settings, Advanced, or place it at `backend/config/cookies.txt`.
+The app now surfaces a short explanation for this in the UI instead of a bare HTTP status code — for example, "YouTube blocked this request — likely bot-detection or an expired cookies.txt, not an app bug." — with a pointer back to this section. Here's the full explanation.
+
+**Cause.** Almost always a missing or stale `backend/config/cookies.txt`, not a bug in the app or in `yt-dlp`'s client selection. Without cookies from a real, logged-in browser session, YouTube is far more likely to block stream requests as bot traffic.
+
+**Why "stale" doesn't mean "expired".** The auth cookies YouTube issues (`__Secure-3PSIDTS`, `__Secure-1PSIDTS`, and related `__Secure-*` cookies) carry an expiry timestamp far in the future, so `cookies.txt` can look perfectly valid and still fail. That's because YouTube treats these as *rotating* session tokens: a browser that's still logged in periodically gets reissued a new value, and the server invalidates the previous one — independent of what the old cookie's own expiry field says. A `cookies.txt` exported days or weeks ago can silently stop working even though every timestamp inside it is still in the future. This was confirmed directly: swapping in a freshly-exported `cookies.txt` fixed a previously-403ing download with the exact same code and settings, no code change involved.
+
+**Fix.**
+
+1. In a browser where you're logged into YouTube, export a fresh `cookies.txt` in Netscape format. Browser extensions like "Get cookies.txt LOCALLY" (Chrome/Firefox) do this in one click.
+2. Replace `backend/config/cookies.txt` with the new export, or upload it from the web UI's Settings, Advanced.
+3. Retry the download.
+
+If it 403s again shortly after, the browser you exported from may not be staying logged in (or is also being used to browse YouTube, which rotates the token again and invalidates the copy you just exported). Export again immediately before retrying.
 
 ### The frontend can't reach the backend ("Failed to fetch")
 
@@ -323,6 +335,22 @@ cd frontend
 npm run build
 npm run lint
 ```
+
+### Testing
+
+Backend unit and integration tests live in `backend/tests` and don't touch the network:
+
+```bash
+uv run pytest backend/tests
+```
+
+A script in that directory is excluded from the `pytest` run on purpose (its `manual_` prefix keeps `pytest`'s default discovery from picking it up) because it performs a real download against YouTube. Run it directly when you need to verify actual download behavior:
+
+```bash
+uv run python backend/tests/manual_custom_dir_download.py
+```
+
+See [backend/tests/README.md](backend/tests/README.md) for what each test file covers, including a bug-to-regression-test map.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to open a pull request.
 

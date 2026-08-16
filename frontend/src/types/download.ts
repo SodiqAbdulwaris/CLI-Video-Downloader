@@ -13,7 +13,7 @@ export interface ResolvedMedia {
   entries?: PlaylistEntry[];
 }
 
-export type JobStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type JobStatus = 'queued' | 'running' | 'completed' | 'partial' | 'failed';
 export type JobItemState = 'queued' | 'downloading' | 'done' | 'failed';
 export type SocketStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 

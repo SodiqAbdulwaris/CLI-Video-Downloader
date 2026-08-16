@@ -29,6 +29,12 @@ dependencies = [
     "urllib3==2.7.0",
     "uvicorn==0.52.1",
     "websockets==17.0.1",
-    "yt-dlp==2026.7.4",
-    "yt-dlp-ejs==0.8.0",
+    "yt-dlp",
+    "yt-dlp-ejs",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
 ]

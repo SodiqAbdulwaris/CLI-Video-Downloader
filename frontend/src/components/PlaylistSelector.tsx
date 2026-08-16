@@ -81,7 +81,7 @@ export function PlaylistSelector({
 
                 {/* Index badge */}
                 <span className="font-mono text-[11px] text-muted-foreground w-6 shrink-0 text-right">
-                  #{entry.index + 1}
+                  #{entry.index}
                 </span>
 
                 {/* Thumbnail if available */}

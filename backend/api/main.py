@@ -119,11 +119,20 @@ async def job_events(websocket: WebSocket, job_id: str) -> None:
         return
 
     await websocket.accept()
+    terminal_statuses = {"completed", "partial", "failed"}
     try:
+        if job.status in terminal_statuses:
+            # A reconnect (or a client that connects after the job already
+            # finished) would otherwise block forever: the terminal event was
+            # already consumed from the queue by an earlier connection and
+            # nothing new will ever be emitted.
+            snapshot = job.last_job_event or {"type": "job", "status": job.status, "job_id": job.id}
+            await websocket.send_json(snapshot)
+            return
         while True:
             event = await job.events.get()
             await websocket.send_json(event)
-            if event.get("type") == "job" and event.get("status") in {"completed", "failed"}:
+            if event.get("type") == "job" and event.get("status") in terminal_statuses:
                 break
     except WebSocketDisconnect:
         return
@@ -139,16 +148,22 @@ def _resolve(url: str) -> dict:
 
     if content_type == "playlist":
         entries = get_playlist_entries(info)
-        raw_entries = info.get("entries") or []
+        raw_by_url: dict[str, dict] = {}
+        raw_by_title: dict[str, dict] = {}
+        for raw_entry in info.get("entries") or []:
+            if not raw_entry:
+                continue
+            for url_key in ("webpage_url", "url"):
+                value = raw_entry.get(url_key)
+                if value and value not in raw_by_url:
+                    raw_by_url[value] = raw_entry
+            title = raw_entry.get("title")
+            if title and title not in raw_by_title:
+                raw_by_title[title] = raw_entry
+
         resolved_entries = []
         for entry in entries:
-            raw_match = None
-            for raw_entry in raw_entries:
-                if not raw_entry:
-                    continue
-                if raw_entry.get("title") == entry.title or raw_entry.get("webpage_url") == entry.url or raw_entry.get("url") == entry.url:
-                    raw_match = raw_entry
-                    break
+            raw_match = raw_by_url.get(entry.url) or raw_by_title.get(entry.title)
             thumb_url = extract_thumbnail(raw_match) if raw_match else None
             resolved_entries.append({
                 "index": entry.index,
