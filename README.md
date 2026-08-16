@@ -134,7 +134,7 @@ The frontend has its own `.env` (copy `frontend/.env.example` to `frontend/.env`
 | Partial playlist | Yes | One file per selected video |
 | Audio only | Yes | MP3 |
 
-Available resolutions depend on what the source video actually offers. All downloads are saved directly into a single configured folder; there are no per-type or per-playlist subfolders.
+Available resolutions depend on what the source video actually offers. Single videos, Shorts, and audio-only downloads are saved directly into the configured download folder. Playlist downloads get their own subfolder inside it, named after the playlist, so a playlist's videos land together instead of mixed in with everything else.
 
 If a video has a description, it's saved next to the downloaded file as a plain text file with the same name plus `.description.txt`, for example `My Video.mp4` and `My Video.description.txt`. Videos with no description don't get a text file at all.
 

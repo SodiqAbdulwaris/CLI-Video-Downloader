@@ -196,7 +196,11 @@ class VideoDownloader:
             preferred_res=preferred_resolution or "720p",
             format_type=format_type,
         )
-        target_dir = download_path
+        # Playlist items get their own subfolder (named after the playlist)
+        # inside the configured download directory, so a playlist's videos
+        # land together instead of flat alongside everything else. Single
+        # videos/Shorts are unaffected — download_path is used as-is.
+        target_dir = download_path / sanitize_name(playlist_title) if playlist_title else download_path
         ensure_directory(target_dir)
 
         context = DownloadContext(

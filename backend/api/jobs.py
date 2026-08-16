@@ -6,6 +6,7 @@ import re
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -13,7 +14,7 @@ import yt_dlp
 
 from api.thumbnail import extract_thumbnail
 from download_engine.downloader import VideoDownloader
-from download_engine.file_utils import ensure_directory
+from download_engine.file_utils import ensure_directory, sanitize_name
 from download_engine.logging_utils import log_error
 from download_engine.playlist import PlaylistEntry, get_playlist_entries
 from services.history_service import history_service
@@ -431,6 +432,15 @@ class JobManager:
     ) -> None:
         try:
             completed_at = datetime.now(timezone.utc).isoformat()
+            base_location = settings_service.get_download_directory() or "Downloads/"
+            # Playlist items land in a subfolder named after the playlist
+            # (see download_engine.downloader.download) — reflect that here
+            # so history points at where the files actually are.
+            download_location = (
+                str(Path(base_location) / sanitize_name(job.title))
+                if job.media_type == "playlist"
+                else base_location
+            )
             session = {
                 "id": job.id,
                 "createdAt": job.start_time or completed_at,
@@ -445,7 +455,7 @@ class JobManager:
                 "total": completed_count + failed_count,
                 "successful": completed_count,
                 "failed": failed_count,
-                "downloadLocation": settings_service.get_download_directory() or "Downloads/",
+                "downloadLocation": download_location,
                 "thumbnail": job.thumbnail,
                 "files": files_list,
             }

@@ -154,7 +154,8 @@ def test_playlist_partial_selection_downloads_only_the_chosen_videos(client, mon
     final_event = _wait_for_terminal_status(job_id)
     assert final_event["status"] == "completed"  # an all-success job event carries no completed/failed counts
 
-    downloaded = sorted(p.name for p in (tmp_path / "downloads").glob("*.mp4"))
+    # Playlist items land in a subfolder named after the playlist.
+    downloaded = sorted(p.name for p in (tmp_path / "downloads" / "Five Videos").glob("*.mp4"))
     assert len(downloaded) == 2
     assert any("Video Two" in name for name in downloaded)
     assert any("Video Four" in name for name in downloaded)
@@ -168,6 +169,24 @@ def test_playlist_partial_selection_downloads_only_the_chosen_videos(client, mon
     assert session["failed"] == 0
     downloaded_titles = {f["title"] for f in session["files"]}
     assert downloaded_titles == {"Video Two", "Video Four"}
+    assert session["downloadLocation"] == str(tmp_path / "downloads" / "Five Videos")
+
+
+def test_single_video_download_has_no_subfolder(client, monkeypatch, tmp_path):
+    """Only playlists get a subfolder — a single video still lands directly
+    in the configured download directory."""
+    _use_stub(monkeypatch, {SINGLE_URL: video_info("Test Video")})
+    resp = client.post("/api/download", json={"url": SINGLE_URL, "format_type": "video", "resolution": "360p"})
+    job_id = resp.json()["job_id"]
+    _wait_for_terminal_status(job_id)
+
+    assert list((tmp_path / "downloads").glob("*.mp4")) != []
+    assert list((tmp_path / "downloads").iterdir()) == [
+        p for p in (tmp_path / "downloads").iterdir() if p.is_file()
+    ]  # no subdirectories created
+
+    session = client.get("/api/history").json()[0]
+    assert session["downloadLocation"] == str(tmp_path / "downloads")
 
 
 def test_playlist_zero_based_index_is_rejected_end_to_end(client, monkeypatch):
