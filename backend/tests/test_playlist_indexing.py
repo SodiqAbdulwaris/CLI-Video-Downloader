@@ -1,7 +1,7 @@
 import pytest
 
 from api.jobs import _select_positions
-from core.playlist import PlaylistEntry, get_playlist_entries
+from download_engine.playlist import PlaylistEntry, get_playlist_entries
 
 
 def test_get_playlist_entries_is_one_based():

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from core.formats import FormatOption
-from core.playlist import PlaylistEntry, PlaylistSelectionError, parse_selection
+from download_engine.formats import FormatOption
+from download_engine.playlist import PlaylistEntry, PlaylistSelectionError, parse_selection
 
 
 def prompt_url() -> str:

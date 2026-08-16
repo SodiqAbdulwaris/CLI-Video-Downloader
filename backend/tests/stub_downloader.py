@@ -11,7 +11,7 @@ from typing import Any
 
 import yt_dlp
 
-from core.downloader import VideoDownloader
+from download_engine.downloader import VideoDownloader
 
 
 class StubVideoDownloader(VideoDownloader):

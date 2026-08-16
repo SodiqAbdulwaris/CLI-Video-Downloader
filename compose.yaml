@@ -22,7 +22,7 @@ services:
 
     volumes:
       - ./backend/data:/app/backend/data
-      - ./backend/config:/app/backend/config
+      - ./cookies:/app/cookies
       - ${DOWNLOADS_ROOT_HOST:?Set DOWNLOADS_ROOT_HOST in your .env file — see .env.example}:/downloads
 
   bgutil:

@@ -23,7 +23,7 @@ Three kinds of test live here, in increasing order of what they actually exercis
 
 ## Integration tests (`test_integration_api.py`)
 
-Uses `fastapi.testclient.TestClient` against the real app. Only `core.downloader.VideoDownloader` is swapped for `StubVideoDownloader` (see `stub_downloader.py`) — a real `VideoDownloader` subclass with just the actual yt-dlp network calls (`fetch_info`, `_download_stream`) replaced by canned data. Everything else — retry logic, error logging, playlist iteration, partial/failed status, filename generation, history persistence, WebSocket event emission — runs for real.
+Uses `fastapi.testclient.TestClient` against the real app. Only `download_engine.downloader.VideoDownloader` is swapped for `StubVideoDownloader` (see `stub_downloader.py`) — a real `VideoDownloader` subclass with just the actual yt-dlp network calls (`fetch_info`, `_download_stream`) replaced by canned data. Everything else — retry logic, error logging, playlist iteration, partial/failed status, filename generation, history persistence, WebSocket event emission — runs for real.
 
 `HistoryService`/`SettingsService` are pointed at a `tmp_path` per test via monkeypatch, so tests never touch `backend/data/*.json`.
 

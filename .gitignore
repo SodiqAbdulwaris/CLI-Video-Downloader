@@ -19,11 +19,11 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-backend/errors.log
+errors.log
 YT-links.md
 
 Downloads/
-backend/config/cookies.txt
+cookies/cookies.txt
 backend/data/*.json
 backend/data/*.json.corrupt
 !backend/data/.gitkeep

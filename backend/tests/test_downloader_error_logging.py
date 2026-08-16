@@ -1,10 +1,10 @@
 from pathlib import Path
 from unittest.mock import patch
 
-import core.downloader as dlmod
-from core.downloader import VideoDownloader, VideoDownloaderError
-from core.formats import FormatSelection
-from core.playlist import PlaylistEntry
+import download_engine.downloader as dlmod
+from download_engine.downloader import VideoDownloader, VideoDownloaderError
+from download_engine.formats import FormatSelection
+from download_engine.playlist import PlaylistEntry
 
 
 def _make_selection():
@@ -36,8 +36,6 @@ def test_download_retry_exhaustion_logs_once_and_marks_exception():
          patch.object(d, "fetch_info", return_value={"title": "X"}), \
          patch.object(d, "get_formats", return_value=[]), \
          patch.object(d, "select_best_format", return_value=selection), \
-         patch("core.downloader.resolve_output_path", return_value=Path(".")), \
-         patch("core.downloader.ensure_directory", side_effect=lambda p: p), \
          patch.object(d, "_download_once", side_effect=VideoDownloaderError("boom")):
 
         try:
@@ -55,7 +53,7 @@ def test_playlist_download_does_not_double_log_already_logged_failure():
 
     with patch.object(dlmod, "log_error", lambda **kw: log_calls.append(kw)), \
          patch.object(d, "fetch_playlist_listing", return_value={"title": "PL"}), \
-         patch("core.downloader.get_playlist_entries", return_value=[entry]), \
+         patch("download_engine.downloader.get_playlist_entries", return_value=[entry]), \
          patch.object(d, "fetch_info", return_value={"title": "Video 1"}), \
          patch.object(d, "get_formats", return_value=[]), \
          patch.object(d, "select_best_format", return_value=_make_selection()), \
@@ -64,7 +62,7 @@ def test_playlist_download_does_not_double_log_already_logged_failure():
 
         result = d.download_playlist(
             url="https://pl", indices=[0], resolution="720p",
-            format_type="video", playlist_info={"title": "PL"},
+            format_type="video", download_path=Path("."), playlist_info={"title": "PL"},
         )
 
     assert result.failed == 1
@@ -78,12 +76,12 @@ def test_playlist_download_logs_pre_download_failures():
 
     with patch.object(dlmod, "log_error", lambda **kw: log_calls.append(kw)), \
          patch.object(d, "fetch_playlist_listing", return_value={"title": "PL"}), \
-         patch("core.downloader.get_playlist_entries", return_value=[entry]), \
+         patch("download_engine.downloader.get_playlist_entries", return_value=[entry]), \
          patch.object(d, "fetch_info", side_effect=VideoDownloaderError("metadata fetch failed")):
 
         result = d.download_playlist(
             url="https://pl", indices=[0], resolution="720p",
-            format_type="video", playlist_info={"title": "PL"},
+            format_type="video", download_path=Path("."), playlist_info={"title": "PL"},
         )
 
     assert result.failed == 1

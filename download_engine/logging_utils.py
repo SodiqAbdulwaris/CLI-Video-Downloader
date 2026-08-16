@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from config.settings import DOWNLOAD_LOG_FILE, ERROR_LOG_FILE
+from download_engine.config import DOWNLOAD_LOG_FILE, ERROR_LOG_FILE
 
 
 def _write_entry(path: Path, entry: str) -> None:

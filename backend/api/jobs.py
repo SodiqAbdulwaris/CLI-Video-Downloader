@@ -9,8 +9,9 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from api.thumbnail import extract_thumbnail
-from core.downloader import VideoDownloader
-from core.playlist import PlaylistEntry, get_playlist_entries
+from download_engine.downloader import VideoDownloader
+from download_engine.file_utils import ensure_directory
+from download_engine.playlist import PlaylistEntry, get_playlist_entries
 from services.history_service import history_service
 from services.settings_service import settings_service
 
@@ -136,6 +137,7 @@ class JobManager:
         failed_count = 0
 
         try:
+            download_path = ensure_directory(settings_service.require_target_download_dir())
             downloader = VideoDownloader()
             listing_info = downloader.fetch_playlist_listing(job.url)
             media_type = downloader.detect_type(listing_info)
@@ -155,6 +157,7 @@ class JobManager:
                     indices=positions,
                     resolution=job.resolution,
                     format_type=job.format_type,
+                    download_path=download_path,
                     playlist_info=listing_info,
                     progress_hook_factory=lambda entry: self._progress_hook(job, entry, entry.title),
                     item_status_callback=lambda entry, state, error: self._set_item_state(
@@ -211,7 +214,7 @@ class JobManager:
                 final_path = downloader.download(
                     url=job.url,
                     selection=None,
-                    download_path=None,
+                    download_path=download_path,
                     media_type=media_type,
                     preferred_resolution=job.resolution,
                     format_type=job.format_type,

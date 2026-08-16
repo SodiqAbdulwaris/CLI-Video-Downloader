@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from config.settings import DEFAULT_RESOLUTION_PRIORITY
+from download_engine.config import DEFAULT_RESOLUTION_PRIORITY
 
 
 @dataclass(slots=True)

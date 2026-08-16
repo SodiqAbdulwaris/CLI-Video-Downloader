@@ -9,9 +9,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(_REPO_ROOT))
+sys.path.insert(0, str(_REPO_ROOT / "backend"))
 
-from core.downloader import VideoDownloader
+from download_engine.downloader import VideoDownloader
 from services.settings_service import settings_service
 
 TARGET_DIR = r"C:\Users\HP\S.A Stuffs\MyWorks\Projects\CLI Video Downloader"
@@ -44,7 +46,7 @@ def main() -> int:
         final_path = downloader.download(
             url=URL,
             selection=None,
-            download_path=None,  # forces resolve_output_path() -> the setting above
+            download_path=settings_service.require_target_download_dir(),
             media_type=media_type,
             preferred_resolution="360p",
             format_type="video",

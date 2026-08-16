@@ -13,10 +13,12 @@ from api.jobs import JobManager
 from api.settings import router as settings_router
 from api.thumbnail import extract_thumbnail
 from config.settings import CORS_ALLOWED_ORIGINS
-from core.downloader import VideoDownloader, VideoDownloaderError
-from core.playlist import get_playlist_entries
+from download_engine.config import COOKIES_FILE_PATH
+from download_engine.downloader import VideoDownloader, VideoDownloaderError
+from download_engine.file_utils import ensure_directory
+from download_engine.playlist import get_playlist_entries
+from download_engine.validators import is_valid_url
 from services.settings_service import settings_service
-from utils.validators import is_valid_url
 
 MAX_COOKIES_FILE_SIZE = 1 * 1024 * 1024  # cookies.txt files are a few KB at most
 
@@ -98,10 +100,9 @@ async def upload_cookies(file: UploadFile = File(...)):
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded cookies file is empty.")
 
-    config_dir = Path(__file__).resolve().parent.parent / "config"
-    config_dir.mkdir(parents=True, exist_ok=True)
+    cookies_path = COOKIES_FILE_PATH
+    ensure_directory(cookies_path.parent)
 
-    cookies_path = config_dir / "cookies.txt"
     tmp_path = cookies_path.with_suffix(".txt.tmp")
     tmp_path.write_bytes(content)
     tmp_path.replace(cookies_path)

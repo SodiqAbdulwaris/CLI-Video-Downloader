@@ -9,12 +9,12 @@ from pathlib import Path
 from typing import Any, Callable, Literal
 
 import yt_dlp
-from config.settings import COOKIES_FILE_PATH, DEFAULT_RETRY_ATTEMPTS, DEFAULT_TIMEOUT_SECONDS
-from core.ffmpeg import FFmpegError, convert_to_mp3, merge_streams
-from core.formats import FormatOption, FormatSelection, list_resolutions, normalize_formats, select_format
-from core.playlist import PlaylistEntry, get_playlist_entries, is_playlist
-from utils.file_utils import ensure_directory, ensure_unique_path, resolve_output_path, sanitize_name, temporary_prefix
-from utils.logging_utils import log_download, log_error
+from download_engine.config import COOKIES_FILE_PATH, DEFAULT_RETRY_ATTEMPTS, DEFAULT_TIMEOUT_SECONDS
+from download_engine.ffmpeg import FFmpegError, convert_to_mp3, merge_streams
+from download_engine.formats import FormatOption, FormatSelection, list_resolutions, normalize_formats, select_format
+from download_engine.playlist import PlaylistEntry, get_playlist_entries, is_playlist
+from download_engine.file_utils import ensure_directory, ensure_unique_path, sanitize_name, temporary_prefix
+from download_engine.logging_utils import log_download, log_error
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ class VideoDownloader:
         self,
         url: str,
         selection: FormatSelection | None,
-        download_path: Path | None,
+        download_path: Path,
         media_type: str,
         preferred_resolution: str | None = None,
         format_type: str = "video",
@@ -196,7 +196,7 @@ class VideoDownloader:
             preferred_res=preferred_resolution or "720p",
             format_type=format_type,
         )
-        target_dir = download_path or resolve_output_path(media_type=media_type, playlist_title=playlist_title)
+        target_dir = download_path
         ensure_directory(target_dir)
 
         context = DownloadContext(
@@ -245,6 +245,7 @@ class VideoDownloader:
         indices: list[int],
         resolution: str | None,
         format_type: str,
+        download_path: Path,
         playlist_info: dict[str, Any] | None = None,
         progress_hook_factory: Callable[[PlaylistEntry], ProgressHook | None] | None = None,
         item_status_callback: PlaylistItemStatusCallback | None = None,
@@ -272,7 +273,7 @@ class VideoDownloader:
                 final_path = self.download(
                     url=entry.url,
                     selection=selected,
-                    download_path=resolve_output_path(media_type="playlist", playlist_title=playlist_title),
+                    download_path=download_path,
                     media_type="playlist",
                     preferred_resolution=resolution,
                     format_type=format_type,
@@ -315,7 +316,7 @@ class VideoDownloader:
                     resolution=resolution or "auto",
                     format_type="audio-only" if format_type == "audio" else "video+audio",
                     codec="unknown",
-                    download_path=str(resolve_output_path("playlist", playlist_title)),
+                    download_path=str(download_path),
                     filename=entry.title,
                     error_message=str(exc),
                 )

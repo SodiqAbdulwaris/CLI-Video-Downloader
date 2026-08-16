@@ -1,4 +1,4 @@
-from core.downloader import _explain_download_error
+from download_engine.downloader import _explain_download_error
 
 
 def test_403_gets_expanded_with_cause_and_next_step():
