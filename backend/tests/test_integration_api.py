@@ -29,11 +29,20 @@ def client(tmp_path, monkeypatch):
         yield c
 
 
-def _use_stub(monkeypatch, responses, fail_urls=None):
-    stub = StubVideoDownloader(responses, fail_urls)
+def _use_stub(monkeypatch, responses, fail_urls=None, hold=False):
+    stub = StubVideoDownloader(responses, fail_urls, hold=hold)
     monkeypatch.setattr(jobs_module, "VideoDownloader", lambda: stub)
     monkeypatch.setattr(main_module, "VideoDownloader", lambda: stub)
     return stub
+
+
+def _wait_until(predicate, timeout=5.0, interval=0.02):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return False
 
 
 def _wait_for_terminal_status(job_id, timeout=5.0):
@@ -188,7 +197,10 @@ def test_websocket_reconnect_after_completion_gets_snapshot(client, monkeypatch)
 
     with client.websocket_connect(f"/api/ws/{job_id}") as ws:
         event = ws.receive_json()
-    assert event == {"type": "job", "status": "completed", "job_id": job_id}
+    assert event == {
+        "type": "job", "status": "completed", "job_id": job_id,
+        "completed": 1, "failed": 0,
+    }
 
 
 def test_settings_roundtrip(client, tmp_path):
@@ -212,3 +224,135 @@ def test_history_delete_and_clear(client, monkeypatch, tmp_path):
     time.sleep(0.2)
     assert client.delete("/api/history").status_code == 200
     assert client.get("/api/history").json() == []
+
+
+def _task_ids(job_id):
+    return list(main_module.jobs.get_job(job_id).task_ids)
+
+
+def _task_state(task_id):
+    return main_module.jobs.get_task(task_id).state
+
+
+def test_settings_concurrency_roundtrip(client):
+    resp = client.put("/api/settings", json={"max_concurrent_downloads": 5})
+    assert resp.status_code == 200
+    assert client.get("/api/settings").json()["max_concurrent_downloads"] == 5
+
+
+def test_settings_concurrency_rejects_out_of_range(client):
+    resp = client.put("/api/settings", json={"max_concurrent_downloads": 16})
+    assert resp.status_code == 400
+    resp = client.put("/api/settings", json={"max_concurrent_downloads": 0})
+    assert resp.status_code == 400
+
+
+def test_concurrency_limit_is_respected_across_playlist_items(client, monkeypatch):
+    """4 playlist videos, limit 2: never more than 2 should be mid-download
+    at once, exercising the same per-video scheduling used across jobs."""
+    client.put("/api/settings", json={"max_concurrent_downloads": 2})
+    entries = [
+        {"title": f"Video {i}", "playlist_index": i, "webpage_url": f"https://x/{i}"}
+        for i in range(1, 5)
+    ]
+    responses = {PL_URL: playlist_info("Four Videos", entries)}
+    for i in range(1, 5):
+        responses[f"https://x/{i}"] = video_info(f"Video {i}", str(i))
+    stub = _use_stub(monkeypatch, responses, hold=True)
+
+    resp = client.post("/api/download", json={"url": PL_URL, "format_type": "video", "resolution": "360p"})
+    job_id = resp.json()["job_id"]
+
+    assert _wait_until(lambda: stub.active_count >= 2), "expected 2 concurrent downloads to start"
+    time.sleep(0.15)  # give a 3rd/4th a chance to slip through if the limit were broken
+    assert stub.active_count <= 2
+    assert stub.peak_active <= 2
+
+    stub.release()
+    final_event = _wait_for_terminal_status(job_id)
+    assert final_event["status"] == "completed"
+
+
+def test_two_separate_jobs_share_the_concurrency_limit(client, monkeypatch):
+    """Concurrency applies across jobs too, not just within one playlist."""
+    client.put("/api/settings", json={"max_concurrent_downloads": 1})
+    url_a = "https://www.youtube.com/watch?v=aaa"
+    url_b = "https://www.youtube.com/watch?v=bbb"
+    stub = _use_stub(monkeypatch, {url_a: video_info("A", "aaa"), url_b: video_info("B", "bbb")}, hold=True)
+
+    resp_a = client.post("/api/download", json={"url": url_a, "format_type": "video", "resolution": "360p"})
+    resp_b = client.post("/api/download", json={"url": url_b, "format_type": "video", "resolution": "360p"})
+
+    assert _wait_until(lambda: stub.active_count >= 1)
+    time.sleep(0.15)
+    assert stub.active_count <= 1
+    assert stub.peak_active <= 1
+
+    stub.release()
+    _wait_for_terminal_status(resp_a.json()["job_id"])
+    _wait_for_terminal_status(resp_b.json()["job_id"])
+
+
+def test_pause_then_resume_completes_the_job(client, monkeypatch):
+    stub = _use_stub(monkeypatch, {SINGLE_URL: video_info("Test Video")}, hold=True)
+    resp = client.post("/api/download", json={"url": SINGLE_URL, "format_type": "video", "resolution": "360p"})
+    job_id = resp.json()["job_id"]
+
+    assert _wait_until(lambda: stub.active_count >= 1)
+    task_id = _task_ids(job_id)[0]
+
+    pause_resp = client.post(f"/api/tasks/{task_id}/pause")
+    assert pause_resp.status_code == 200
+    assert _wait_until(lambda: _task_state(task_id) == "paused")
+    assert _wait_until(lambda: main_module.jobs.get_job(job_id).status == "paused")
+
+    resume_resp = client.post(f"/api/tasks/{task_id}/resume")
+    assert resume_resp.status_code == 200
+    assert _wait_until(lambda: stub.active_count >= 1)
+
+    stub.release()
+    final_event = _wait_for_terminal_status(job_id)
+    assert final_event["status"] == "completed"
+
+
+def test_cancel_task_leaves_no_partial_file(client, monkeypatch, tmp_path):
+    stub = _use_stub(monkeypatch, {SINGLE_URL: video_info("Test Video")}, hold=True)
+    resp = client.post("/api/download", json={"url": SINGLE_URL, "format_type": "video", "resolution": "360p"})
+    job_id = resp.json()["job_id"]
+
+    assert _wait_until(lambda: stub.active_count >= 1)
+    task_id = _task_ids(job_id)[0]
+
+    cancel_resp = client.post(f"/api/tasks/{task_id}/cancel")
+    assert cancel_resp.status_code == 200
+    assert _wait_until(lambda: _task_state(task_id) == "cancelled")
+
+    final_event = _wait_for_terminal_status(job_id)
+    assert final_event["status"] == "failed"  # the only task was cancelled, none succeeded
+    assert list((tmp_path / "downloads").glob("*.mp4")) == []
+
+
+def test_cancel_job_cancels_every_pending_task(client, monkeypatch):
+    """Cancelling a whole job stops both the active download and any videos
+    still waiting for a concurrency slot."""
+    client.put("/api/settings", json={"max_concurrent_downloads": 1})
+    entries = [
+        {"title": "Video 1", "playlist_index": 1, "webpage_url": "https://x/1"},
+        {"title": "Video 2", "playlist_index": 2, "webpage_url": "https://x/2"},
+        {"title": "Video 3", "playlist_index": 3, "webpage_url": "https://x/3"},
+    ]
+    responses = {PL_URL: playlist_info("Three Videos", entries)}
+    for i in range(1, 4):
+        responses[f"https://x/{i}"] = video_info(f"Video {i}", str(i))
+    _use_stub(monkeypatch, responses, hold=True)
+
+    resp = client.post("/api/download", json={"url": PL_URL, "format_type": "video", "resolution": "360p"})
+    job_id = resp.json()["job_id"]
+    assert _wait_until(lambda: any(_task_state(t) == "downloading" for t in _task_ids(job_id)))
+
+    cancel_resp = client.post(f"/api/jobs/{job_id}/cancel")
+    assert cancel_resp.status_code == 200
+
+    assert _wait_until(lambda: all(_task_state(t) == "cancelled" for t in _task_ids(job_id)))
+    final_event = _wait_for_terminal_status(job_id)
+    assert final_event["status"] == "failed"

@@ -24,6 +24,10 @@ _file_lock = Lock()
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:/")
 _WINDOWS_UNC = re.compile(r"^//[^/]+/")
 
+DEFAULT_MAX_CONCURRENT_DOWNLOADS = 2
+MIN_CONCURRENT_DOWNLOADS = 1
+MAX_CONCURRENT_DOWNLOADS_LIMIT = 15
+
 
 class SettingsError(RuntimeError):
     """Base error raised for invalid or unusable download location values."""
@@ -76,23 +80,35 @@ class SettingsService:
 
     def _read_raw_settings(self) -> dict[str, Any]:
         self._ensure_data_dir()
+        defaults = {
+            "download_directory": None,
+            "max_concurrent_downloads": DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+        }
         if not self.file_path.exists():
-            return {"download_directory": None}
+            return defaults
 
         try:
             with open(self.file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if not isinstance(data, dict):
                 logger.warning("Settings file structure invalid; treating as unconfigured.")
-                return {"download_directory": None}
-            value = data.get("download_directory")
-            return {"download_directory": value if isinstance(value, str) else None}
+                return defaults
+            directory = data.get("download_directory")
+            concurrency = data.get("max_concurrent_downloads")
+            if not isinstance(concurrency, int) or not (
+                MIN_CONCURRENT_DOWNLOADS <= concurrency <= MAX_CONCURRENT_DOWNLOADS_LIMIT
+            ):
+                concurrency = DEFAULT_MAX_CONCURRENT_DOWNLOADS
+            return {
+                "download_directory": directory if isinstance(directory, str) else None,
+                "max_concurrent_downloads": concurrency,
+            }
         except json.JSONDecodeError as exc:
             logger.error("Failed to parse settings.json: %s", exc)
-            return {"download_directory": None}
+            return defaults
         except Exception as exc:
             logger.error("Failed to read settings.json: %s", exc)
-            return {"download_directory": None}
+            return defaults
 
     def _write_raw_settings(self, data: dict[str, Any]) -> None:
         self._ensure_data_dir()
@@ -136,8 +152,28 @@ class SettingsService:
             self._require_writable_directory(host_path)
 
         with _file_lock:
-            self._write_raw_settings({"download_directory": value})
+            current = self._read_raw_settings()
+            current["download_directory"] = value
+            self._write_raw_settings(current)
         return {"download_directory": value}
+
+    def get_max_concurrent_downloads(self) -> int:
+        with _file_lock:
+            return self._read_raw_settings()["max_concurrent_downloads"]
+
+    def update_max_concurrent_downloads(self, value: int) -> dict[str, int]:
+        if not isinstance(value, int) or isinstance(value, bool) or not (
+            MIN_CONCURRENT_DOWNLOADS <= value <= MAX_CONCURRENT_DOWNLOADS_LIMIT
+        ):
+            raise SettingsError(
+                f"Concurrent downloads must be an integer between {MIN_CONCURRENT_DOWNLOADS} "
+                f"and {MAX_CONCURRENT_DOWNLOADS_LIMIT}."
+            )
+        with _file_lock:
+            current = self._read_raw_settings()
+            current["max_concurrent_downloads"] = value
+            self._write_raw_settings(current)
+        return {"max_concurrent_downloads": value}
 
     def _require_writable_directory(self, directory: Path) -> None:
         try:

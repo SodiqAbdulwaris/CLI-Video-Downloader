@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from pathlib import Path
 
 from api.history import router as history_router
-from api.jobs import JobManager
+from api.jobs import JobManager, TaskNotFoundError
 from api.settings import router as settings_router
 from api.thumbnail import extract_thumbnail
 from config.settings import CORS_ALLOWED_ORIGINS
@@ -85,7 +85,42 @@ async def download(request: DownloadRequest) -> dict[str, str]:
     )
     return {"job_id": job.id}
 
- 
+
+@app.post("/api/tasks/{task_id}/pause")
+async def pause_task(task_id: str) -> dict[str, str]:
+    try:
+        task = jobs.pause_task(task_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"task_id": task.id, "status": task.state}
+
+
+@app.post("/api/tasks/{task_id}/resume")
+async def resume_task(task_id: str) -> dict[str, str]:
+    try:
+        task = jobs.resume_task(task_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"task_id": task.id, "status": task.state}
+
+
+@app.post("/api/tasks/{task_id}/cancel")
+async def cancel_task(task_id: str) -> dict[str, str]:
+    try:
+        task = jobs.cancel_task(task_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"task_id": task.id, "status": task.state}
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str) -> dict[str, str]:
+    try:
+        job = jobs.cancel_job(job_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"job_id": job.id, "status": job.status}
+
 
 @app.post("/api/cookies")
 async def upload_cookies(file: UploadFile = File(...)):
