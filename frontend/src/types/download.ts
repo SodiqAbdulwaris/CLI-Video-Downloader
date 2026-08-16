@@ -13,11 +13,13 @@ export interface ResolvedMedia {
   entries?: PlaylistEntry[];
 }
 
-export type JobStatus = 'queued' | 'running' | 'completed' | 'partial' | 'failed';
-export type JobItemState = 'queued' | 'downloading' | 'done' | 'failed';
-export type SocketStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+export type JobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'partial' | 'failed';
+export type JobItemState = 'queued' | 'downloading' | 'paused' | 'done' | 'failed' | 'cancelled';
+// 'failed' here means reconnect attempts were exhausted — the backend appears unreachable.
+export type SocketStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'failed';
 
 export interface JobItem {
+  task_id: string | null;
   index: number | null;
   title: string;
   state: JobItemState;
@@ -36,6 +38,7 @@ export type SocketEvent =
     }
   | {
       type: 'item';
+      task_id?: string | null;
       index: number | null;
       title?: string;
       item?: string;
@@ -45,6 +48,7 @@ export type SocketEvent =
     }
   | {
       type: 'progress';
+      task_id?: string | null;
       item?: string;
       index?: number | null;
       status?: string;

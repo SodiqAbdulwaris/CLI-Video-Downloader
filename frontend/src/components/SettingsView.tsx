@@ -10,7 +10,8 @@ import {
   Upload,
   Check,
   RefreshCw,
-  FileText
+  FileText,
+  Layers
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -23,6 +24,8 @@ interface SettingsViewProps {
   onCheckServerHealth: () => void;
   downloadDirectory: string | null;
   onChangeDownloadLocation: () => void;
+  maxConcurrentDownloads: number;
+  onChangeMaxConcurrentDownloads: (value: number) => Promise<void>;
 }
 
 export function SettingsView({
@@ -32,7 +35,30 @@ export function SettingsView({
   onCheckServerHealth,
   downloadDirectory,
   onChangeDownloadLocation,
+  maxConcurrentDownloads,
+  onChangeMaxConcurrentDownloads,
 }: SettingsViewProps) {
+  const [concurrencyInput, setConcurrencyInput] = useState(String(maxConcurrentDownloads));
+  const [concurrencyError, setConcurrencyError] = useState<string | null>(null);
+  const [isSavingConcurrency, setIsSavingConcurrency] = useState(false);
+
+  const handleSaveConcurrency = async () => {
+    const value = Number(concurrencyInput);
+    if (!Number.isInteger(value) || value < 1 || value > 15) {
+      setConcurrencyError('Enter a whole number between 1 and 15.');
+      return;
+    }
+    setConcurrencyError(null);
+    setIsSavingConcurrency(true);
+    try {
+      await onChangeMaxConcurrentDownloads(value);
+    } catch (err: unknown) {
+      setConcurrencyError(err instanceof Error ? err.message : 'Failed to save.');
+    } finally {
+      setIsSavingConcurrency(false);
+    }
+  };
+
   const [openFolderAfter, setOpenFolderAfter] = useState<boolean>(() => {
     return localStorage.getItem('auto_open_folder') === 'true';
   });
@@ -218,6 +244,43 @@ export function SettingsView({
             />
           </label>
         </div>
+      </div>
+
+      {/* SECTION 1b: Concurrent Downloads */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-card border border-border/80 shadow-2xs flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Layers className="size-4 text-primary" />
+          <h3 className="font-bold text-sm text-foreground">Concurrent Downloads</h3>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-muted/40 border border-border/50 text-xs">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="font-semibold text-foreground">Maximum videos downloading at once</span>
+            <span className="text-[11px] text-muted-foreground">
+              Applies across all jobs — including videos from the same playlist. 1–15, default 2.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="number"
+              min={1}
+              max={15}
+              value={concurrencyInput}
+              onChange={(e) => setConcurrencyInput(e.target.value)}
+              className="w-16 h-8 px-2.5 rounded-lg border border-border/60 bg-background text-center font-mono text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <Button
+              size="sm"
+              onClick={handleSaveConcurrency}
+              disabled={isSavingConcurrency || Number(concurrencyInput) === maxConcurrentDownloads}
+              className="h-8 px-3 rounded-xl text-xs font-semibold gap-1.5"
+            >
+              {isSavingConcurrency ? <RefreshCw className="size-3 animate-spin" /> : <Check className="size-3" />}
+              <span>Save</span>
+            </Button>
+          </div>
+        </div>
+        {concurrencyError && <p className="text-xs text-destructive px-1">{concurrencyError}</p>}
       </div>
 
       {/* SECTION 2: Appearance */}

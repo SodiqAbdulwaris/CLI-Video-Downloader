@@ -26,7 +26,7 @@ export function DownloadCompleteDialog({
 }: DownloadCompleteDialogProps) {
   const totalCount = jobItems.length;
   const successfulCount = jobItems.filter(item => item.state === 'done').length;
-  const failedItems = jobItems.filter(item => item.state === 'failed');
+  const failedItems = jobItems.filter(item => item.state === 'failed' || item.state === 'cancelled');
   const failedCount = failedItems.length;
 
   const isAllSuccess = successfulCount > 0 && failedCount === 0;

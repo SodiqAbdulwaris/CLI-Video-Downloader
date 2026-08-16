@@ -5,6 +5,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export interface AppSettings {
   download_directory: string | null;
+  max_concurrent_downloads: number;
 }
 
 export function getWsUrl(baseUrl: string, jobId: string): string {
@@ -111,3 +112,32 @@ export async function updateDownloadDirectory(download_directory: string): Promi
 
   return response.json();
 }
+
+export async function updateMaxConcurrentDownloads(max_concurrent_downloads: number): Promise<AppSettings> {
+  const response = await fetch(`${API_BASE_URL}/api/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ max_concurrent_downloads })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Failed to update the concurrent download limit.');
+  }
+
+  return response.json();
+}
+
+async function postTaskAction(path: string): Promise<{ status: string }> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { method: 'POST' });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Request failed.');
+  }
+  return response.json();
+}
+
+export const pauseTask = (taskId: string) => postTaskAction(`/api/tasks/${taskId}/pause`);
+export const resumeTask = (taskId: string) => postTaskAction(`/api/tasks/${taskId}/resume`);
+export const cancelTask = (taskId: string) => postTaskAction(`/api/tasks/${taskId}/cancel`);
+export const cancelJob = (jobId: string) => postTaskAction(`/api/jobs/${jobId}/cancel`);

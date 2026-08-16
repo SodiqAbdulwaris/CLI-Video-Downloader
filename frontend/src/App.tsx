@@ -10,11 +10,13 @@ import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
 import { DownloadCompleteDialog } from './components/DownloadCompleteDialog';
 import { DownloadLocationDialog } from './components/DownloadLocationDialog';
-import { useDownloadSocket } from './hooks/useDownloadSocket';
+import { useDownloadJobs } from './hooks/useDownloadJobs';
 import { useDownloadHistory } from './hooks/useDownloadHistory';
-import { resolveMedia, startDownload, getSettings, updateDownloadDirectory, API_BASE_URL } from './lib/api';
+import { resolveMedia, startDownload, getSettings, updateDownloadDirectory, updateMaxConcurrentDownloads, API_BASE_URL } from './lib/api';
 import type { ResolvedMedia } from './types/download';
 import type { HistorySession } from './types/history';
+
+const TERMINAL_JOB_STATUSES = ['completed', 'partial', 'failed'];
 
 export default function App() {
   // Theme state
@@ -30,8 +32,9 @@ export default function App() {
   // Server Connection Status
   const [serverStatus, setServerStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
-  // Download location (persisted backend setting)
+  // Download location / concurrency (persisted backend settings)
   const [downloadDirectory, setDownloadDirectory] = useState<string | null>(null);
+  const [maxConcurrentDownloads, setMaxConcurrentDownloads] = useState<number>(2);
   const [isSettingsLoading, setIsSettingsLoading] = useState(true);
   const [showLocationDialog, setShowLocationDialog] = useState(false);
 
@@ -48,6 +51,7 @@ export default function App() {
   // Media / Resolve State
   const [url, setUrl] = useState('');
   const [isResolving, setIsResolving] = useState(false);
+  const [isSubmittingDownload, setIsSubmittingDownload] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [resolvedData, setResolvedData] = useState<ResolvedMedia | null>(null);
 
@@ -56,28 +60,13 @@ export default function App() {
   const [resolution, setResolution] = useState<string>('');
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
 
-  // Completion Dialog State
-  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
-  const completedJobIdRef = useRef<string | null>(null);
+  // Completion Dialog State — shows once per job, for whichever job most
+  // recently reached a terminal state.
+  const [completionJobId, setCompletionJobId] = useState<string | null>(null);
+  const shownCompletionIds = useRef<Set<string>>(new Set());
 
-  // WebSocket / Download Hook
-  const {
-    jobId,
-    setJobId,
-    jobStatus,
-    setJobStatus,
-    jobError,
-    setJobError,
-    jobItems,
-    setJobItems,
-    progressMap,
-    setProgressMap,
-    socketStatus,
-    socketLogs,
-    setSocketLogs,
-    connect,
-    resetSocketState
-  } = useDownloadSocket();
+  // Download jobs — several can run at once, each with its own live connection.
+  const { jobs, jobList, startJob, removeJob, retryConnection } = useDownloadJobs();
 
   // Apply Dark/Light theme class to html element
   useEffect(() => {
@@ -110,7 +99,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [checkHealth]);
 
-  // Load persisted download location; require setup when none is configured.
+  // Load persisted settings; require download-location setup when none is configured.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -118,6 +107,7 @@ export default function App() {
         const settings = await getSettings();
         if (cancelled) return;
         setDownloadDirectory(settings.download_directory);
+        setMaxConcurrentDownloads(settings.max_concurrent_downloads);
       } catch {
         // Backend unreachable — the server status indicator covers this; do not
         // block the UI on a settings fetch failure.
@@ -138,19 +128,30 @@ export default function App() {
     }
   };
 
-  // Auto completion dialog & history refresh when job finishes
+  const saveMaxConcurrentDownloads = async (value: number) => {
+    const settings = await updateMaxConcurrentDownloads(value);
+    setMaxConcurrentDownloads(settings.max_concurrent_downloads);
+  };
+
+  // Auto completion dialog & history refresh when any job finishes. Keyed on
+  // a status signature, not jobList itself: jobList is a fresh array every
+  // render (including on unrelated progress/log updates), which would
+  // re-run this effect constantly and cancel the timer via its cleanup
+  // before it ever fired — confirmed live, a socketLogs update landing
+  // right after "completed" cancelled the dialog every time.
+  const statusSignature = jobList.map(job => `${job.jobId}:${job.status}`).join(',');
   useEffect(() => {
-    if (jobId && (jobStatus === 'completed' || jobStatus === 'partial' || jobStatus === 'failed')) {
-      if (completedJobIdRef.current !== jobId) {
-        completedJobIdRef.current = jobId;
-        refetchHistory();
-        const timer = setTimeout(() => {
-          setShowCompletionDialog(true);
-        }, 300);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [jobId, jobStatus, refetchHistory]);
+    const justFinished = jobList.find(
+      job => job.status && TERMINAL_JOB_STATUSES.includes(job.status) && !shownCompletionIds.current.has(job.jobId)
+    );
+    if (!justFinished) return;
+
+    shownCompletionIds.current.add(justFinished.jobId);
+    refetchHistory();
+    const timer = setTimeout(() => setCompletionJobId(justFinished.jobId), 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusSignature, refetchHistory]);
 
   // Playlist selection helpers
   const handleSelectAll = () => {
@@ -176,8 +177,6 @@ export default function App() {
     setIsResolving(true);
     setResolveError(null);
     setResolvedData(null);
-    completedJobIdRef.current = null;
-    setShowCompletionDialog(false);
 
     try {
       const data = await resolveMedia(url.trim());
@@ -196,36 +195,26 @@ export default function App() {
     }
   };
 
+  const startDownloadJob = async (payload: Parameters<typeof startDownload>[0]) => {
+    setIsSubmittingDownload(true);
+    try {
+      const { job_id } = await startDownload(payload);
+      startJob(job_id);
+      setActiveTab('downloads');
+    } finally {
+      setIsSubmittingDownload(false);
+    }
+  };
+
   // Start Download Job
   const handleDownload = async () => {
     if (!resolvedData) return;
-
-    completedJobIdRef.current = null;
-    setShowCompletionDialog(false);
-    setJobStatus('queued');
-    setJobError(null);
-    setJobItems([]);
-    setProgressMap({});
-    setSocketLogs([]);
-
-    const payload = {
+    await startDownloadJob({
       url: url.trim(),
       format_type: formatType,
       resolution: formatType === 'video' ? (resolution || null) : null,
-      indices: resolvedData.content_type === 'playlist' ? selectedIndices : null
-    };
-
-    try {
-      const { job_id } = await startDownload(payload);
-      setJobId(job_id);
-      connect(job_id);
-      // Automatically switch to Downloads queue manager view
-      setActiveTab('downloads');
-    } catch (err: unknown) {
-      setJobStatus('failed');
-      const message = err instanceof Error ? err.message : 'Failed to start download.';
-      setJobError(message);
-    }
+      indices: resolvedData.content_type === 'playlist' ? selectedIndices : null,
+    });
   };
 
   // Redownload Session from History
@@ -237,9 +226,6 @@ export default function App() {
     setIsResolving(true);
     setResolveError(null);
     setResolvedData(null);
-    completedJobIdRef.current = null;
-    setShowCompletionDialog(false);
-    resetSocketState();
 
     try {
       const data = await resolveMedia(targetUrl);
@@ -253,51 +239,38 @@ export default function App() {
       setResolution(targetRes || '');
       setSelectedIndices(targetIndices || []);
 
-      setJobStatus('queued');
-      setJobError(null);
-      setJobItems([]);
-      setProgressMap({});
-      setSocketLogs([]);
-
-      const payload = {
+      await startDownloadJob({
         url: targetUrl,
         format_type: targetFormat,
         resolution: targetFormat === 'video' ? targetRes : null,
-        indices: data.content_type === 'playlist' ? targetIndices : null
-      };
-
-      const { job_id } = await startDownload(payload);
-      setJobId(job_id);
-      connect(job_id);
-      setActiveTab('downloads');
+        indices: data.content_type === 'playlist' ? targetIndices : null,
+      });
     } catch (err: unknown) {
-      setJobStatus('failed');
       const message = err instanceof Error ? err.message : 'Failed to start redownload job.';
-      setJobError(message);
+      setResolveError(message);
     } finally {
       setIsResolving(false);
     }
   };
 
-  // Reset overall state for a new download
+  // Reset the resolve/configure form to start a new download. Existing jobs
+  // keep running independently — this doesn't touch them.
   const handleReset = () => {
-    completedJobIdRef.current = null;
-    setShowCompletionDialog(false);
     setUrl('');
     setResolvedData(null);
     setResolution('');
     setSelectedIndices([]);
     setResolveError(null);
-    resetSocketState();
     setActiveTab('download');
   };
 
-  // Active jobs count badge for sidebar
-  const activeJobsCount = (jobStatus === 'running' || jobStatus === 'queued') ? 1 : 0;
+  const activeJobsCount = jobList.filter(job => job.status === 'running' || job.status === 'queued').length;
 
   // Location dialog: forced setup on first run, editable later from Settings.
   const isSetupDialog = downloadDirectory === null && !isSettingsLoading;
   const isChangeDialog = showLocationDialog && downloadDirectory !== null;
+
+  const completionJob = completionJobId ? jobs[completionJobId] : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row transition-colors duration-200">
@@ -340,7 +313,7 @@ export default function App() {
                 onResolve={handleResolve}
                 isResolving={isResolving}
                 resolveError={resolveError}
-                isDisabled={jobStatus === 'running' || jobStatus === 'queued'}
+                isDisabled={isSubmittingDownload}
               />
 
               {/* Resolved Media Configurator */}
@@ -356,7 +329,7 @@ export default function App() {
                   onSelectAll={handleSelectAll}
                   onToggleIndex={handleToggleIndex}
                   onDownload={handleDownload}
-                  isDownloading={jobStatus === 'running' || jobStatus === 'queued'}
+                  isDownloading={isSubmittingDownload}
                   downloadDirectory={downloadDirectory}
                 />
               )}
@@ -375,16 +348,9 @@ export default function App() {
           {/* TAB 2: DOWNLOADS (Active & Completed Download Manager) */}
           {activeTab === 'downloads' && (
             <DownloadsView
-              jobId={jobId}
-              jobStatus={jobStatus}
-              jobError={jobError}
-              jobItems={jobItems}
-              progressMap={progressMap}
-              socketStatus={socketStatus}
-              socketLogs={socketLogs}
-              resolvedData={resolvedData}
-              selectedIndices={selectedIndices}
-              onReset={handleReset}
+              jobs={jobList}
+              onDismissJob={removeJob}
+              onRetryConnection={retryConnection}
               onNavigateToDownload={() => setActiveTab('download')}
             />
           )}
@@ -409,6 +375,8 @@ export default function App() {
               onCheckServerHealth={checkHealth}
               downloadDirectory={downloadDirectory}
               onChangeDownloadLocation={() => setShowLocationDialog(true)}
+              maxConcurrentDownloads={maxConcurrentDownloads}
+              onChangeMaxConcurrentDownloads={saveMaxConcurrentDownloads}
             />
           )}
         </main>
@@ -431,12 +399,14 @@ export default function App() {
         onSave={saveDownloadDirectory}
       />
 
-      {/* Completion Modal */}
+      {/* Completion Modal — shown once per job, for whichever job just finished */}
       <DownloadCompleteDialog
-        open={showCompletionDialog}
-        onOpenChange={setShowCompletionDialog}
-        jobStatus={jobStatus}
-        jobItems={jobItems}
+        open={completionJob !== null}
+        onOpenChange={(open) => {
+          if (!open) setCompletionJobId(null);
+        }}
+        jobStatus={completionJob?.status ?? null}
+        jobItems={completionJob?.items ?? []}
         onDownloadAnother={handleReset}
         downloadDirectory={downloadDirectory}
       />
