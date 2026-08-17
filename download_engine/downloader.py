@@ -33,7 +33,7 @@ def _explain_download_error(raw_message: str) -> str:
         return (
             "YouTube blocked this request — likely bot-detection or an expired "
             "cookies.txt, not an app bug. Export a fresh cookies.txt from a browser "
-            "logged into YouTube and replace backend/config/cookies.txt, then try "
+            "logged into YouTube and replace cookies/cookies.txt, then try "
             "again. See the README's Troubleshooting section, \"YouTube returns a "
             f"403, 429, or bot-detection error\", for the full explanation. ({raw_message})"
         )
