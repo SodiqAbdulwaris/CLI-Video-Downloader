@@ -54,12 +54,14 @@ def prompt_resolution(
 
 def prompt_format_type() -> str:
     while True:
-        choice = input("Download format? (1) Video (2) Audio only: ").strip()
+        choice = input("Download format? (1) Video (2) Audio only (3) Subtitles: ").strip()
         if choice == "1":
             return "video"
         if choice == "2":
             return "audio"
-        print("Invalid choice. Enter 1 or 2.")
+        if choice == "3":
+            return "subtitles"
+        print("Invalid choice. Enter 1, 2, or 3.")
 
 
 def prompt_playlist_choice(total: int) -> tuple[str, list[int]]:

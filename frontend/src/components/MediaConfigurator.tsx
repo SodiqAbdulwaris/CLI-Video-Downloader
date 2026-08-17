@@ -1,4 +1,4 @@
-import { Video, Music, Settings, Download, Sparkles, FolderDown, Layers } from 'lucide-react';
+import { Video, Music, Settings, Download, Sparkles, FolderDown, Layers, Captions } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/card';
 import { Badge } from './ui/badge';
@@ -110,7 +110,7 @@ export function MediaConfigurator({
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Layers className="size-3.5 text-primary" /> Format
               </label>
-              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-muted/60 border border-border/60">
+              <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-muted/60 border border-border/60">
                 <button
                   type="button"
                   onClick={() => onFormatChange('video')}
@@ -136,6 +136,19 @@ export function MediaConfigurator({
                   <Music className={`size-4 ${formatType === 'audio' ? 'text-primary' : ''}`} />
                   <span>Audio (MP3)</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => onFormatChange('subtitles')}
+                  className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                    formatType === 'subtitles'
+                      ? 'bg-card text-foreground shadow-2xs border border-border/80'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Captions className={`size-4 ${formatType === 'subtitles' ? 'text-primary' : ''}`} />
+                  <span>Subtitles (SRT)</span>
+                </button>
               </div>
             </div>
 
@@ -157,6 +170,15 @@ export function MediaConfigurator({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            ) : formatType === 'subtitles' ? (
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Subtitle Language
+                </label>
+                <div className="h-10 px-3 rounded-xl bg-muted/40 border border-border/60 flex items-center text-xs font-mono text-muted-foreground">
+                  English (auto-generated if no manual captions)
+                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-2">

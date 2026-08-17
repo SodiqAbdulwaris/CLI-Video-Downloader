@@ -166,7 +166,9 @@ class VideoDownloader:
         playlist_index: int | None = None,
     ) -> str:
         safe_title = sanitize_name(title)
-        if selection.format_type == "audio":
+        if selection.format_type == "subtitles":
+            base_name = f"{safe_title}_subtitles"
+        elif selection.format_type == "audio":
             bitrate = (
                 f"{selection.audio_bitrate_kbps}kbps" if selection.audio_bitrate_kbps else "unknown"
             )
@@ -338,6 +340,22 @@ class VideoDownloader:
         title = str(info.get("title") or "video")
         with tempfile.TemporaryDirectory(prefix="yt_downloader_") as temp_dir_str:
             temp_dir = Path(temp_dir_str)
+            if selection.format_type == "subtitles":
+                final_name = self.generate_filename(
+                    title=title,
+                    selection=selection,
+                    extension="srt",
+                    playlist_index=context.playlist_index,
+                )
+                final_path = ensure_unique_path(target_dir / final_name)
+                subtitle_path = self._download_subtitle(
+                    url=context.url,
+                    output_prefix=temporary_prefix(temp_dir, "subtitles"),
+                )
+                shutil.move(str(subtitle_path), str(final_path))
+                self._log_success(final_path=final_path, selection=selection, context=context)
+                return final_path
+
             if selection.format_type == "audio":
                 input_path = self._download_stream(
                     url=context.url,
@@ -428,6 +446,35 @@ class VideoDownloader:
             download_path=str(final_path.parent),
             filename=final_path.name,
         )
+
+    def _download_subtitle(self, url: str, output_prefix: Path) -> Path:
+        """Downloads English subtitles (manual captions, falling back to
+        YouTube's auto-generated ones) as a single .srt file via yt-dlp's
+        own subtitle writer — no separate video/audio fetch needed."""
+        before = set(output_prefix.parent.iterdir())
+        options = dict(self._base_options)
+        options.update(
+            {
+                "skip_download": True,
+                "writesubtitles": True,
+                "writeautomaticsub": True,
+                "subtitleslangs": ["en"],
+                "subtitlesformat": "srt",
+                "outtmpl": str(output_prefix) + ".%(ext)s",
+                "noplaylist": True,
+            }
+        )
+        with yt_dlp.YoutubeDL(options) as ydl:
+            ydl.download([url])
+
+        created = [
+            path
+            for path in output_prefix.parent.iterdir()
+            if path not in before and path.is_file() and path.name.startswith(output_prefix.name)
+        ]
+        if not created:
+            raise VideoDownloaderError("No subtitles are available for this video.")
+        return sorted(created, key=lambda item: item.stat().st_mtime, reverse=True)[0]
 
     def _download_stream(
         self,

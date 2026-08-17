@@ -47,7 +47,7 @@ class ResolveRequest(BaseModel):
 
 class DownloadRequest(BaseModel):
     url: str
-    format_type: Literal["video", "audio"]
+    format_type: Literal["video", "audio", "subtitles"]
     resolution: str | None = None
     indices: list[int] | None = Field(
         default=None,

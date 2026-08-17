@@ -36,6 +36,8 @@ class FormatSelection:
 
     @property
     def codec_label(self) -> str:
+        if self.format_type == "subtitles":
+            return "subtitles"
         if self.format_type == "audio":
             bitrate = (
                 f"{self.audio_bitrate_kbps}kbps" if self.audio_bitrate_kbps else "unknown"
@@ -98,6 +100,19 @@ def select_format(
     preferred_resolution: str | None,
     format_type: str,
 ) -> FormatSelection:
+    if format_type == "subtitles":
+        return FormatSelection(
+            resolution="subtitles",
+            format_type="subtitles",
+            container_extension="srt",
+            video_format_id=None,
+            audio_format_id=None,
+            merged=False,
+            video_codec="none",
+            audio_codec="none",
+            audio_bitrate_kbps=None,
+        )
+
     if format_type == "audio":
         return _select_audio_only(formats)
 
